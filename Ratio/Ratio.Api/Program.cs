@@ -13,9 +13,22 @@ if (WindowsServiceHelpers.IsWindowsService())
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("Ratio")
-    ?? throw new InvalidOperationException("Connection string 'Ratio' is not configured. Set ConnectionStrings__Ratio.");
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+string connectionString;
+string[] allowedOrigins;
+using (var startupLogger = new LoggerConfiguration().ReadFrom.Configuration(builder.Configuration).CreateLogger())
+{
+    try
+    {
+        connectionString = builder.Configuration.GetConnectionString("Ratio")
+            ?? throw new InvalidOperationException("Connection string 'Ratio' is not configured. Set ConnectionStrings__Ratio.");
+        allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    }
+    catch (Exception exception)
+    {
+        startupLogger.Fatal(exception, "A API não conseguiu subir: configuração inválida.");
+        throw;
+    }
+}
 
 builder.Host.UseWindowsService();
 builder.Host.UseSerilog((context, logger) => logger
