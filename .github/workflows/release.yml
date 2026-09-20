@@ -1,0 +1,84 @@
+name: Backend Release
+
+on:
+  workflow_run:
+    workflows: ["Backend CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: backend-release
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    name: Publish release
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Plan the release
+        id: plan
+        run: |
+          if [ -n "$(git tag --points-at "$SHA" --list 'v*')" ]; then
+            echo "Commit $SHA already has a release tag"
+            exit 0
+          fi
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "No merged pull request found for $SHA"
+            exit 0
+          fi
+          labels=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | join(",")')
+          tag=$(bash .github/scripts/release-version.sh "$labels")
+          if [ "$tag" = "none" ]; then
+            echo "Pull request #$pr is labeled release:none"
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag from pull request #$pr"
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        if: ${{ steps.plan.outputs.tag != '' }}
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: Ratio/**/packages.lock.json
+
+      - name: Publish self-contained Windows API
+        if: ${{ steps.plan.outputs.tag != '' }}
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: dotnet publish Ratio/Ratio.Api/Ratio.Api.csproj --configuration Release --runtime win-x64 --self-contained true -p:RestoreLockedMode=true -p:Version="${TAG#v}" --output artifacts/api
+
+      - name: Package the release
+        if: ${{ steps.plan.outputs.tag != '' }}
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          cd artifacts/api
+          zip -qr "../ratio-api-${TAG}-win-x64.zip" .
+          cd ..
+          sha256sum "ratio-api-${TAG}-win-x64.zip" > "ratio-api-${TAG}-win-x64.zip.sha256"
+
+      - name: Create the GitHub release
+        if: ${{ steps.plan.outputs.tag != '' }}
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: gh release create "$TAG" "artifacts/ratio-api-${TAG}-win-x64.zip" "artifacts/ratio-api-${TAG}-win-x64.zip.sha256" --repo "$GITHUB_REPOSITORY" --target "$SHA" --title "$TAG" --generate-notes
