@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Ratio.Api;
 using Ratio.Infrastructure;
@@ -20,7 +22,36 @@ builder.Host.UseSerilog((context, logger) => logger
     .ReadFrom.Configuration(context.Configuration)
     .Enrich.FromLogContext());
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    var messages = options.ModelBindingMessageProvider;
+    messages.SetValueIsInvalidAccessor(value => $"O valor {value} não é válido.");
+    messages.SetAttemptedValueIsInvalidAccessor((value, _) => $"O valor '{value}' não é válido.");
+    messages.SetNonPropertyAttemptedValueIsInvalidAccessor(value => $"O valor '{value}' não é válido.");
+    messages.SetMissingRequestBodyRequiredValueAccessor(() => "O corpo da requisição é obrigatório.");
+    messages.SetValueMustNotBeNullAccessor(_ => "O campo é obrigatório.");
+    messages.SetMissingBindRequiredValueAccessor(field => $"O campo '{field}' é obrigatório.");
+    messages.SetMissingKeyOrValueAccessor(() => "O campo é obrigatório.");
+    messages.SetUnknownValueIsInvalidAccessor(field => $"O valor informado em '{field}' não é válido.");
+    messages.SetNonPropertyUnknownValueIsInvalidAccessor(() => "O valor informado não é válido.");
+    messages.SetValueMustBeANumberAccessor(field => $"O campo '{field}' precisa ser um número.");
+    messages.SetNonPropertyValueMustBeANumberAccessor(() => "O valor precisa ser um número.");
+});
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var factory = context.HttpContext.RequestServices.GetRequiredService<ProblemDetailsFactory>();
+        var problem = factory.CreateValidationProblemDetails(
+            context.HttpContext, context.ModelState, StatusCodes.Status400BadRequest);
+        ProblemDetailsTitles.Localize(problem);
+
+        return new ObjectResult(problem)
+        {
+            StatusCode = problem.Status,
+            ContentTypes = { "application/problem+json" }
+        };
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(connectionString);

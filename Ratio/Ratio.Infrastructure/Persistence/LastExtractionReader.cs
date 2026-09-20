@@ -1,10 +1,12 @@
 using Dapper;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Ratio.Application.Abstractions;
 
 namespace Ratio.Infrastructure.Persistence;
 
-public sealed class LastExtractionReader(NpgsqlDataSource dataSource) : ILastExtractionReader
+public sealed class LastExtractionReader(NpgsqlDataSource dataSource, ILogger<LastExtractionReader> logger)
+    : ILastExtractionReader
 {
     private const string LastExtractionSql = "SELECT MAX(extracted_at) FROM dw.fact_case_event";
 
@@ -20,8 +22,9 @@ public sealed class LastExtractionReader(NpgsqlDataSource dataSource) : ILastExt
                 ? null
                 : new DateTimeOffset(DateTime.SpecifyKind(extractedAt.Value, DateTimeKind.Utc));
         }
-        catch (NpgsqlException)
+        catch (NpgsqlException exception)
         {
+            logger.LogError(exception, "Falha ao ler a última extração do DW.");
             return null;
         }
     }
