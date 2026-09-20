@@ -1,0 +1,42 @@
+name: Release label
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: release-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Release label
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the release label and announce the version
+        run: |
+          if ! tag=$(bash .github/scripts/release-version.sh "$LABELS" 2>/tmp/error); then
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "No release decision yet: $(cat /tmp/error)"
+            echo "::error::$(cat /tmp/error)"
+            exit 1
+          fi
+          if [ "$tag" = "none" ]; then
+            body="This pull request does not create a release."
+          else
+            body="Merging this pull request publishes **$tag**. The number is computed from the latest tag and becomes final only when the pull request is merged."
+          fi
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
