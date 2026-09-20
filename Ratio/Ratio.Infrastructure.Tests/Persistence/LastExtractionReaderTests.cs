@@ -1,10 +1,11 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Ratio.Infrastructure.Persistence;
 
 namespace Ratio.Infrastructure.Tests.Persistence;
 
 public class LastExtractionReaderTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>, IAsyncLifetime
 {
-    private readonly LastExtractionReader _reader = new(postgres.DataSource);
+    private readonly LastExtractionReader _reader = new(postgres.DataSource, NullLogger<LastExtractionReader>.Instance);
 
     public Task InitializeAsync() => postgres.ExecuteAsync("DROP SCHEMA IF EXISTS dw CASCADE");
 

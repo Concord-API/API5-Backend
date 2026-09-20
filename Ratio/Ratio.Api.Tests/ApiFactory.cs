@@ -15,6 +15,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     {
         builder.UseSetting("ConnectionStrings:Ratio", "Host=localhost;Database=unused");
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
-        builder.ConfigureTestServices(services => services.AddSingleton(LastExtractionReader.Object));
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton(LastExtractionReader.Object);
+            // Expõe os controllers de teste (ValidationProbeController) à aplicação.
+            services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
+        });
     }
 }

@@ -6,6 +6,7 @@ namespace Ratio.Api;
 public static class ProblemDetailsTitles
 {
     private const string FrameworkUnhandledErrorTitle = "An error occurred while processing your request.";
+    private const string FrameworkValidationErrorTitle = "One or more validation errors occurred.";
 
     public static void Localize(ProblemDetails problem)
     {
@@ -13,7 +14,8 @@ public static class ProblemDetailsTitles
 
         if (problem.Title is null
             || problem.Title == ReasonPhrases.GetReasonPhrase(status)
-            || problem.Title == FrameworkUnhandledErrorTitle)
+            || problem.Title == FrameworkUnhandledErrorTitle
+            || problem.Title == FrameworkValidationErrorTitle)
         {
             problem.Title = For(status);
         }
