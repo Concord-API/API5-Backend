@@ -16,13 +16,33 @@ public class HealthController(ILastExtractionReader lastExtractionReader) : Cont
     [HttpGet("ready")]
     public async Task<IActionResult> Ready(CancellationToken cancellationToken)
     {
-        var lastExtractionAt = await lastExtractionReader.GetLastExtractionAsync(cancellationToken);
+        var lastExtraction = await lastExtractionReader.GetLastExtractionAsync(cancellationToken);
 
-        return lastExtractionAt is null
-            ? Problem(
-                title: "Não está pronto",
-                detail: "O banco não possui dados carregados ou está inacessível.",
-                statusCode: StatusCodes.Status503ServiceUnavailable)
-            : Ok(new { status = "Pronto", lastExtractionAt });
+        return lastExtraction.Availability switch
+        {
+            WarehouseAvailability.Ready =>
+                Ok(new { status = "Pronto", lastExtractionAt = lastExtraction.ExtractedAt }),
+
+            WarehouseAvailability.Empty => NotReady(
+                reason: "sem carga publicada",
+                detail: "O banco respondeu, mas não há carga publicada no schema dw. "
+                      + "Restaure o dump da última carga."),
+
+            _ => NotReady(
+                reason: "banco inacessível",
+                detail: "Não foi possível consultar o banco de dados. "
+                      + "A causa está no log da aplicação.")
+        };
+    }
+
+    private ObjectResult NotReady(string reason, string detail)
+    {
+        var response = Problem(
+            title: "Não está pronto",
+            detail: detail,
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+
+        ((ProblemDetails)response.Value!).Extensions["reason"] = reason;
+        return response;
     }
 }
