@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Moq;
+using Ratio.Application.Abstractions;
 
 namespace Ratio.Api.Tests.Controllers;
 
@@ -24,7 +25,7 @@ public class HealthControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         var extractedAt = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
         factory.LastExtractionReader
             .Setup(r => r.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(extractedAt);
+            .ReturnsAsync(LastExtraction.At(extractedAt));
 
         var response = await _client.GetAsync("/health/ready");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -35,17 +36,34 @@ public class HealthControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
-    public async Task Ready_returns_service_unavailable_when_no_data_is_loaded()
+    public async Task Ready_says_the_warehouse_is_empty_when_no_load_was_published()
     {
         factory.LastExtractionReader
             .Setup(r => r.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((DateTimeOffset?)null);
+            .ReturnsAsync(LastExtraction.Empty);
 
         var response = await _client.GetAsync("/health/ready");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal("Não está pronto", body.GetProperty("title").GetString());
+        Assert.Equal("sem carga publicada", body.GetProperty("reason").GetString());
+        Assert.Contains("não há carga publicada", body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Ready_says_the_database_is_unreachable_when_the_query_fails()
+    {
+        factory.LastExtractionReader
+            .Setup(r => r.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LastExtraction.Unavailable);
+
+        var response = await _client.GetAsync("/health/ready");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("Não está pronto", body.GetProperty("title").GetString());
+        Assert.Equal("banco inacessível", body.GetProperty("reason").GetString());
+        Assert.Contains("log da aplicação", body.GetProperty("detail").GetString());
     }
 }

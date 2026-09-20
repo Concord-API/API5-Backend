@@ -10,7 +10,14 @@ public sealed class LastExtractionReader(NpgsqlDataSource dataSource, ILogger<La
 {
     private const string LastExtractionSql = "SELECT MAX(extracted_at) FROM dw.fact_case_event";
 
-    public async Task<DateTimeOffset?> GetLastExtractionAsync(CancellationToken cancellationToken)
+    /// <summary>Banco de pé, mas sem o schema dw: o dump da carga nunca foi restaurado.</summary>
+    private static readonly string[] NotPublishedYet =
+    [
+        PostgresErrorCodes.UndefinedTable,
+        PostgresErrorCodes.InvalidSchemaName
+    ];
+
+    public async Task<LastExtraction> GetLastExtractionAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -19,16 +26,20 @@ public sealed class LastExtractionReader(NpgsqlDataSource dataSource, ILogger<La
                 new CommandDefinition(LastExtractionSql, cancellationToken: cancellationToken));
 
             return extractedAt is null
-                ? null
-                : new DateTimeOffset(DateTime.SpecifyKind(extractedAt.Value, DateTimeKind.Utc));
+                ? LastExtraction.Empty
+                : LastExtraction.At(new DateTimeOffset(DateTime.SpecifyKind(extractedAt.Value, DateTimeKind.Utc)));
+        }
+        catch (PostgresException exception) when (NotPublishedYet.Contains(exception.SqlState))
+        {
+            logger.LogWarning(exception, "O schema dw não existe: a carga ainda não foi publicada neste banco.");
+            return LastExtraction.Empty;
         }
         catch (NpgsqlException exception)
         {
-            // /health/ready responde 503 de qualquer jeito, mas sem esta linha a causa
-            // (credencial errada, schema ausente, banco parado) some: no servidor do
-            // cliente o log em arquivo é o único diagnóstico disponível.
+            // Sem esta linha a causa (credencial errada, banco parado, permissão faltando)
+            // some: no servidor do cliente o log em arquivo é o único diagnóstico disponível.
             logger.LogError(exception, "Falha ao ler a última extração do DW.");
-            return null;
+            return LastExtraction.Unavailable;
         }
     }
 }

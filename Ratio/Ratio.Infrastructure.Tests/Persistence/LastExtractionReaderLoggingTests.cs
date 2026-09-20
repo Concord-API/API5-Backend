@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Ratio.Application.Abstractions;
 using Ratio.Infrastructure.Persistence;
 
 namespace Ratio.Infrastructure.Tests.Persistence;
@@ -19,7 +20,7 @@ public class LastExtractionReaderLoggingTests
 
         var result = await reader.GetLastExtractionAsync(CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(WarehouseAvailability.Unavailable, result.Availability);
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Error, entry.Level);
         Assert.NotNull(entry.Exception);
