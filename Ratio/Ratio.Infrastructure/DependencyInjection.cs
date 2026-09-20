@@ -9,7 +9,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
     {
-        services.AddSingleton(NpgsqlDataSource.Create(connectionString));
+        services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
         services.AddSingleton<ILastExtractionReader, LastExtractionReader>();
         return services;
     }

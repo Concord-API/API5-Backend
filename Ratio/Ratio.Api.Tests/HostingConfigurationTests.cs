@@ -1,17 +1,26 @@
-using Microsoft.Extensions.Configuration;
+using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Ratio.Api.Tests;
 
 public class HostingConfigurationTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
-    public void Api_listens_only_on_loopback_behind_the_proxy()
+    public void Shipped_configuration_binds_kestrel_to_loopback_only()
     {
-        var configuration = factory.Services.GetRequiredService<IConfiguration>();
+        var contentRoot = factory.Services.GetRequiredService<IHostEnvironment>().ContentRootPath;
+        using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(contentRoot, "appsettings.json")));
 
-        var url = configuration["Kestrel:Endpoints:Http:Url"];
+        var url = settings.RootElement
+            .GetProperty("Kestrel").GetProperty("Endpoints").GetProperty("Http")
+            .GetProperty("Url").GetString();
 
-        Assert.StartsWith("http://127.0.0.1:", url);
+        Assert.True(
+            Uri.TryCreate(url, UriKind.Absolute, out var endpoint)
+                && IPAddress.TryParse(endpoint.Host, out var address)
+                && IPAddress.IsLoopback(address),
+            $"Kestrel precisa escutar só em loopback; o pacote está configurado para '{url}'.");
     }
 }

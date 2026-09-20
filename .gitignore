@@ -482,3 +482,5 @@ $RECYCLE.BIN/
 *.swp
 
 Ratio/Ratio.Api/appsettings.Production.json
+
+artifacts/
