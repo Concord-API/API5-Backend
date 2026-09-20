@@ -5,11 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Ratio.Infrastructure\Ratio.Infrastructure.csproj" />
+    <ProjectReference Include="..\Ratio.Api\Ratio.Api.csproj" />
   </ItemGroup>
 
 </Project>
