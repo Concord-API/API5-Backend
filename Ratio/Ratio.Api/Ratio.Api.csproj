@@ -9,7 +9,8 @@
 
   <ItemGroup>
     <Content Remove="appsettings.Production.example.json" />
-    <None Include="appsettings.Production.example.json" />
+    <None Include="appsettings.Production.example.json" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>
