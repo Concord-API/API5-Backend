@@ -1,6 +1,0 @@
-@Ratio.Api_HostAddress = http://localhost:5047
-
-GET {{Ratio.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

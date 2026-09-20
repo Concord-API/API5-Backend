@@ -1,9 +1,9 @@
 <Solution>
+  <Project Path="Ratio.Api.Tests/Ratio.Api.Tests.csproj" />
   <Project Path="Ratio.Api/Ratio.Api.csproj" />
-  <Project Path="Ratio.Application.Tests/Ratio.Application.Tests.csproj" Id="5497e91d-fb9a-47d2-900d-ef9ac88058ad" />
-  <Project Path="Ratio.Application/Ratio.Application.csproj" Id="76b47607-01b9-43f5-b663-787c744cebe2" />
-  <Project Path="Ratio.Domain/Ratio.Domain.csproj" Id="da49fac1-3624-48da-9013-3a89d986ed1f" />
-  <Project Path="Ratio.Etl/Ratio.Etl.csproj" Id="5d7fcd74-c34e-4df9-a015-04aa075816b1" />
-  <Project Path="Ratio.Infrastructure.Tests/Ratio.Infrastructure.Tests.csproj" Id="be57f142-4a93-4beb-8fa5-3a964205eeca" />
-  <Project Path="Ratio.Infrastructure/Ratio.Infrastructure.csproj" Id="09564e64-2030-4964-83c9-f39a37b60f37" />
+  <Project Path="Ratio.Application.Tests/Ratio.Application.Tests.csproj" />
+  <Project Path="Ratio.Application/Ratio.Application.csproj" />
+  <Project Path="Ratio.Domain/Ratio.Domain.csproj" />
+  <Project Path="Ratio.Infrastructure.Tests/Ratio.Infrastructure.Tests.csproj" />
+  <Project Path="Ratio.Infrastructure/Ratio.Infrastructure.csproj" />
 </Solution>
