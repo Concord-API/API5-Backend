@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Dapper" />
     <PackageReference Include="Npgsql" />
+    <PackageReference Include="dbup-postgresql" />
   </ItemGroup>
 
   <ItemGroup>
