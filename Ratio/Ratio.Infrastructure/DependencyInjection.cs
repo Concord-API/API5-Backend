@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Ratio.Application.Abstractions;
+using Ratio.Infrastructure.Migrations;
 using Ratio.Infrastructure.Persistence;
 
 namespace Ratio.Infrastructure;
@@ -11,6 +13,8 @@ public static class DependencyInjection
     {
         services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
         services.AddSingleton<ILastExtractionReader, LastExtractionReader>();
+        services.AddSingleton<IDatabaseMigrator>(provider =>
+            new DatabaseMigrator(connectionString, provider.GetRequiredService<ILogger<DatabaseMigrator>>()));
         return services;
     }
 }
