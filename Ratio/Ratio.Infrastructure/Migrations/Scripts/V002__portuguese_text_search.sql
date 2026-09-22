@@ -1,0 +1,21 @@
+CREATE TEXT SEARCH CONFIGURATION dw.pt_unaccent (PARSER = pg_catalog."default");
+
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR asciiword WITH portuguese_stem;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR word WITH public.unaccent, portuguese_stem;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR numword WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR email WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR url WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR host WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR sfloat WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR version WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR hword_numpart WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR hword_part WITH public.unaccent, portuguese_stem;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR hword_asciipart WITH portuguese_stem;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR numhword WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR asciihword WITH portuguese_stem;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR hword WITH public.unaccent, portuguese_stem;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR url_path WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR file WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR "float" WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR "int" WITH simple;
+ALTER TEXT SEARCH CONFIGURATION dw.pt_unaccent ADD MAPPING FOR uint WITH simple;
