@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Ratio.Api;
+using Ratio.Api.Hosting;
 using Ratio.Infrastructure;
 using Serilog;
 

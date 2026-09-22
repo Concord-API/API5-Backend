@@ -1,6 +1,6 @@
 using Ratio.Application.Abstractions;
 
-namespace Ratio.Api;
+namespace Ratio.Api.Hosting;
 
 public sealed class DatabaseMigrationService(IDatabaseMigrator migrator, ILogger<DatabaseMigrationService> logger)
     : IHostedService
