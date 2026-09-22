@@ -64,4 +64,17 @@ public class ThemeSearchColumnsTests(PostgresFixture postgres) : IClassFixture<P
 
         Assert.Equal(GeneratedAlways, exception.SqlState);
     }
+
+    [Theory]
+    [InlineData("idx_dim_theme_fts", "CREATE INDEX idx_dim_theme_fts ON dw.dim_theme USING gin (search_vector)")]
+    [InlineData("idx_dim_theme_name_trgm", "CREATE INDEX idx_dim_theme_name_trgm ON dw.dim_theme USING gin (theme_name_norm gin_trgm_ops)")]
+    public async Task Indexes_the_search_columns(string indexName, string definition)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+
+        var indexDefinition = await connection.ExecuteScalarAsync<string>(
+            "SELECT indexdef FROM pg_indexes WHERE schemaname = 'dw' AND indexname = @indexName", new { indexName });
+
+        Assert.Equal(definition, indexDefinition);
+    }
 }
