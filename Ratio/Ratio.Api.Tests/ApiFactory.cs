@@ -11,6 +11,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public Mock<ILastExtractionReader> LastExtractionReader { get; } = new();
 
+    public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
+
+    public ApiFactory() =>
+        DatabaseMigrator.Setup(migrator => migrator.MigrateAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:Ratio", "Host=localhost;Database=unused");
@@ -18,6 +23,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton(LastExtractionReader.Object);
+            services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });
     }

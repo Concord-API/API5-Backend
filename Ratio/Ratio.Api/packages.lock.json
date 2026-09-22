@@ -47,6 +47,11 @@
           "Swashbuckle.AspNetCore.SwaggerUI": "6.6.2"
         }
       },
+      "dbup-core": {
+        "type": "Transitive",
+        "resolved": "6.0.4",
+        "contentHash": "+7btP67vLsBM1VBPMH8H3RHfSy715qlMkOV3JJFzErA4Mz+b6EzDS2KNd/rQyBpSWsuJI3d58GtU0nYZxoLBqA=="
+      },
       "Microsoft.Extensions.ApiDescription.Server": {
         "type": "Transitive",
         "resolved": "6.0.5",
@@ -158,7 +163,8 @@
           "Dapper": "[2.1.35, )",
           "Npgsql": "[9.0.3, )",
           "Ratio.Application": "[1.0.0, )",
-          "Ratio.Domain": "[1.0.0, )"
+          "Ratio.Domain": "[1.0.0, )",
+          "dbup-postgresql": "[6.1.2, )"
         }
       },
       "Dapper": {
@@ -166,6 +172,16 @@
         "requested": "[2.1.35, )",
         "resolved": "2.1.35",
         "contentHash": "YKRwjVfrG7GYOovlGyQoMvr1/IJdn+7QzNXJxyMh0YfFF5yvDmTYaJOVYWsckreNjGsGSEtrMTpnzxTUq/tZQw=="
+      },
+      "dbup-postgresql": {
+        "type": "CentralTransitive",
+        "requested": "[6.1.2, )",
+        "resolved": "6.1.2",
+        "contentHash": "4JRRiS7+rmqZKawe1ho8McM0ClE5clWypjZ600gFSL06pY98Q9XwFVyMI9GW32+q0sJNXb/eQXH0pSeDVJnd+Q==",
+        "dependencies": {
+          "Npgsql": "9.0.3",
+          "dbup-core": "6.0.4"
+        }
       },
       "Npgsql": {
         "type": "CentralTransitive",
