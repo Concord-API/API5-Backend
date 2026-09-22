@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Ratio.Api;
+using Ratio.Api.Hosting;
 using Ratio.Infrastructure;
 using Serilog;
 
@@ -68,6 +69,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddHostedService<DatabaseMigrationService>();
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context => ProblemDetailsTitles.Localize(context.ProblemDetails));
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
