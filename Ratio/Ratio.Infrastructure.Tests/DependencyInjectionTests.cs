@@ -1,5 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using Ratio.Application.Abstractions;
+using Ratio.Infrastructure.Migrations;
 
 namespace Ratio.Infrastructure.Tests;
 
@@ -18,5 +22,16 @@ public class DependencyInjectionTests
         await provider.DisposeAsync();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(async () => await dataSource.OpenConnectionAsync());
+    }
+
+    [Fact]
+    public void Registers_the_database_migrator()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<DatabaseMigrator>(provider.GetRequiredService<IDatabaseMigrator>());
     }
 }
