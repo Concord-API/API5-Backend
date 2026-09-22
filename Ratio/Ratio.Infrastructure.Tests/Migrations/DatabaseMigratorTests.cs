@@ -34,6 +34,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
     [
         "V001__dw_schema.sql",
         "V002__portuguese_text_search.sql",
+        "V003__theme_search_columns.sql",
         "V005__theme_strength.sql"
     ];
 
