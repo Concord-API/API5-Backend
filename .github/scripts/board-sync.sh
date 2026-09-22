@@ -27,6 +27,16 @@ target_status() {
   esac
 }
 
+other_pull_request_open() {
+  local issue="$1" current="$2" url
+  while read -r url || [[ -n "$url" ]]; do
+    if [[ -n "$url" && "$url" != "$current" ]] && [[ "$(gh pr view "$url" --json state --jq .state)" == "OPEN" ]]; then
+      return 0
+    fi
+  done < <(gh issue view "$issue" -R "$BOARD_REPO" --json comments --jq '.comments[].body' | sed -n 's/^Pull request: //p')
+  return 1
+}
+
 main() {
   set -euo pipefail
 
@@ -46,6 +56,9 @@ main() {
 
   local status project field option item
   status="$(target_status "$EVENT" "$MERGED")"
+  if [[ "$EVENT" == "closed" ]] && other_pull_request_open "$issue" "${PR_URL-}"; then
+    status="Review"
+  fi
   project="$(gh project view "$BOARD_NUMBER" --owner "$BOARD_OWNER" --format json --jq .id)"
   read -r field option < <(gh project field-list "$BOARD_NUMBER" --owner "$BOARD_OWNER" --format json \
     --jq ".fields[] | select(.name == \"Status\") | .id + \" \" + (.options[] | select(.name == \"$status\") | .id)")
@@ -60,7 +73,7 @@ main() {
     fi
   fi
 
-  if [[ "$EVENT" == "closed" && "$MERGED" == "true" ]]; then
+  if [[ "$status" == "Done" ]]; then
     gh issue close "$issue" -R "$BOARD_REPO" --reason completed >/dev/null
   fi
 }
