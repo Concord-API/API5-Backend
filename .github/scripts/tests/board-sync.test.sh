@@ -40,6 +40,7 @@ case "$1 $2" in
   "project view") echo "PVT_1" ;;
   "project field-list") echo "FIELD_1 OPTION_1" ;;
   "project item-add") echo "ITEM_1" ;;
+  "pr view") echo "${FAKE_PR_STATE-MERGED}" ;;
 esac
 EOF
 chmod +x "$sandbox/bin/gh"
@@ -98,6 +99,25 @@ assert_contains "merged closes the issue" "issue close 102 -R Concord-API/API-5 
 run EVENT=closed BRANCH=0.12-Create-the-dw-schema MERGED=false PR_URL="$pr" FAKE_ISSUE=102
 assert_contains "closed without merge looks up In Progress" '"In Progress"' "$calls"
 assert_not_contains "closed without merge keeps the issue open" "issue close" "$calls"
+
+other="https://github.com/Concord-API/API5-Frontend/pull/3"
+linked="$(printf 'Pull request: %s\nPull request: %s' "$pr" "$other")"
+
+run EVENT=closed BRANCH=0.12-Create-the-dw-schema MERGED=true PR_URL="$pr" FAKE_ISSUE=102 FAKE_COMMENTS="$linked" FAKE_PR_STATE=OPEN
+assert_contains "merged with another open pull request checks it" "pr view $other" "$calls"
+assert_not_contains "merged does not check its own pull request" "pr view $pr" "$calls"
+assert_contains "merged with another open pull request stays in Review" '"Review"' "$calls"
+assert_not_contains "merged with another open pull request keeps the issue open" "issue close" "$calls"
+
+run EVENT=closed BRANCH=0.12-Create-the-dw-schema MERGED=true PR_URL="$pr" FAKE_ISSUE=102 FAKE_COMMENTS="$linked" FAKE_PR_STATE=MERGED
+assert_contains "merged after every pull request looks up Done" '"Done"' "$calls"
+assert_contains "merged after every pull request closes the issue" "issue close 102" "$calls"
+
+run EVENT=closed BRANCH=0.12-Create-the-dw-schema MERGED=true PR_URL="$pr" FAKE_ISSUE=102 FAKE_COMMENTS="$linked" FAKE_PR_STATE=CLOSED
+assert_contains "abandoned pull requests do not block Done" '"Done"' "$calls"
+
+run EVENT=closed BRANCH=0.12-Create-the-dw-schema MERGED=false PR_URL="$pr" FAKE_ISSUE=102 FAKE_COMMENTS="$linked" FAKE_PR_STATE=OPEN
+assert_contains "closed without merge with another open pull request stays in Review" '"Review"' "$calls"
 
 if ((failures > 0)); then
   echo "$failures failure(s)"
