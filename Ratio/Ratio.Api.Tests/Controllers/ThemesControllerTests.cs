@@ -138,4 +138,41 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         factory.ThemeSearchReader.Verify(
             reader => reader.SearchThemesAsync("abc", 20, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Theory]
+    [InlineData("/api/themes?limit=7", null, 7)]
+    [InlineData("/api/themes?q=&limit=8", "", 8)]
+    [InlineData("/api/themes?q=%20%20%20&limit=9", "   ", 9)]
+    public async Task Returns_the_top_themes_when_the_query_is_empty(string url, string? query, int limit)
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(limit, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var response = await _client.GetAsync(url);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("", body.GetProperty("query").GetString());
+        Assert.Equal(1, body.GetProperty("total").GetInt32());
+        Assert.Equal(412, body.GetProperty("themes")[0].GetProperty("themeKey").GetInt64());
+        factory.ThemeSearchReader.Verify(
+            reader => reader.TopThemesAsync(limit, It.IsAny<CancellationToken>()), Times.Once);
+        factory.ThemeSearchReader.Verify(
+            reader => reader.SearchThemesAsync(query, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Defaults_the_top_themes_limit_to_20_when_absent()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await _client.GetAsync("/api/themes");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        factory.ThemeSearchReader.Verify(
+            reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
