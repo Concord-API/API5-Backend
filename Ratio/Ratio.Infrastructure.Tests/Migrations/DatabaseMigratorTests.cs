@@ -41,7 +41,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V006__order_theme_search_by_strength.sql",
         "V006__search_synonyms.sql",
         "V007__top_themes.sql",
-        "V008__search_only_judged_themes.sql"
+        "V008__search_only_judged_themes.sql",
+        "V009__break_strength_ties_by_volume.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
