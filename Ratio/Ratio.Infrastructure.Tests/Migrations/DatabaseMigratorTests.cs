@@ -25,6 +25,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "dim_subject",
         "dim_theme",
         "fact_case_event",
+        "search_synonym",
         "strength_config"
     ];
 
@@ -36,7 +37,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V002__portuguese_text_search.sql",
         "V003__theme_search_columns.sql",
         "V004__search_themes.sql",
-        "V005__theme_strength.sql"
+        "V005__theme_strength.sql",
+        "V006__search_synonyms.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
