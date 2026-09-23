@@ -28,7 +28,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "strength_config"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "theme_strength", "theme_summary"];
 
     private static DatabaseMigrator Migrator(string connectionString) =>
         new(connectionString, NullLogger<DatabaseMigrator>.Instance);
@@ -46,7 +46,9 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
 
         var applied = await Migrator(database).MigrateAsync(CancellationToken.None);
 
-        Assert.Collection(applied, script => Assert.EndsWith("V001__dw_schema.sql", script));
+        Assert.Collection(applied,
+            script => Assert.EndsWith("V001__dw_schema.sql", script),
+            script => Assert.EndsWith("V005__theme_strength.sql", script));
         Assert.Equal(Tables, await QueryAsync<string>(database,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dw' AND table_type = 'BASE TABLE' ORDER BY table_name"));
         Assert.Equal(MaterializedViews, await QueryAsync<string>(database,
@@ -73,7 +75,9 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         await Migrator(database).MigrateAsync(CancellationToken.None);
 
         var journal = await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions");
-        Assert.Collection(journal, script => Assert.EndsWith("V001__dw_schema.sql", script));
+        Assert.Collection(journal,
+            script => Assert.EndsWith("V001__dw_schema.sql", script),
+            script => Assert.EndsWith("V005__theme_strength.sql", script));
     }
 
     [Fact]
@@ -85,7 +89,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         var applied = await Migrator(database).MigrateAsync(CancellationToken.None);
 
         Assert.Empty(applied);
-        Assert.Single(await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions"));
+        Assert.Equal(2, (await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions")).Length);
     }
 
     [Fact]
@@ -97,8 +101,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
             Migrator(database).MigrateAsync(CancellationToken.None),
             Migrator(database).MigrateAsync(CancellationToken.None));
 
-        Assert.Single(runs.SelectMany(applied => applied));
-        Assert.Single(await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions"));
+        Assert.Equal(2, runs.SelectMany(applied => applied).Count());
+        Assert.Equal(2, (await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions")).Length);
     }
 
     [Fact]
