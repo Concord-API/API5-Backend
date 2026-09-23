@@ -28,9 +28,10 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "strength_config"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "theme_strength", "theme_summary"];
 
-    private static readonly string[] Scripts = ["V001__dw_schema.sql", "V002__portuguese_text_search.sql", "V003__theme_search_columns.sql"];
+    private static readonly string[] Scripts =
+        ["V001__dw_schema.sql", "V002__portuguese_text_search.sql", "V003__theme_search_columns.sql", "V005__theme_strength.sql"];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
         names.Select(name => name[(name.LastIndexOf(".V", StringComparison.Ordinal) + 1)..]).ToArray();
