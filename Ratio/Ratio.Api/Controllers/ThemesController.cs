@@ -24,6 +24,13 @@ public class ThemesController(IThemeSearchReader themeSearchReader) : Controller
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, cancellationToken);
+
+            return Ok(new { query = "", total = topThemes.Count, themes = topThemes });
+        }
+
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
 
         return Ok(new { query = q, total = themes.Count, themes });

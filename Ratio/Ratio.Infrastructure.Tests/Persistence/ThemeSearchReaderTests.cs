@@ -55,6 +55,14 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_strength");
     }
 
+    private async Task<TopTheme[]> TopThemesAsync(int limit)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        return (await connection.QueryAsync<TopTheme>(
+            "SELECT theme_key AS ThemeKey, theme_name AS ThemeName, rank AS Rank, position AS Position FROM dw.top_themes(@limit)",
+            new { limit })).ToArray();
+    }
+
     private async Task InsertThemeAsync(long themeKey, string themeName)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
@@ -176,4 +184,77 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(["Atraso de entrega de imóvel", "Multa por atraso de voo"], results.Select(theme => theme.Name));
         Assert.True(results[0].StrengthScore < results[1].StrengthScore);
     }
+
+    [Fact]
+    public async Task Orders_the_top_themes_by_judged_volume()
+    {
+        await InsertThemeAsync(10, "Multa por atraso de voo");
+        await InsertThemeAsync(11, "Cobrança de dívida");
+        await InsertThemeAsync(12, "Atraso de entrega de imóvel");
+        await InsertJudgedCasesAsync(10, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
+        await InsertJudgedCasesAsync(11, upheldCount: 4, rejectedCount: 1, dateSk: 20240615);
+        await InsertJudgedCasesAsync(12, upheldCount: 2, rejectedCount: 1, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var results = await TopThemesAsync(20);
+
+        Assert.Equal(["Cobrança de dívida", "Atraso de entrega de imóvel", "Multa por atraso de voo"], results.Select(theme => theme.ThemeName));
+        Assert.Equal([1L, 2L, 3L], results.Select(theme => theme.Position));
+        Assert.All(results, theme => Assert.Null(theme.Rank));
+    }
+
+    [Fact]
+    public async Task Breaks_top_theme_volume_ties_by_theme_name()
+    {
+        await InsertThemeAsync(13, "Tarifa bancária abusiva");
+        await InsertThemeAsync(14, "Seguro prestamista não contratado");
+        await InsertJudgedCasesAsync(13, upheldCount: 2, rejectedCount: 0, dateSk: 20240615);
+        await InsertJudgedCasesAsync(14, upheldCount: 1, rejectedCount: 1, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var results = await TopThemesAsync(20);
+
+        Assert.Equal(["Seguro prestamista não contratado", "Tarifa bancária abusiva"], results.Select(theme => theme.ThemeName));
+    }
+
+    [Fact]
+    public async Task Cuts_the_top_themes_at_the_limit()
+    {
+        await InsertThemeAsync(15, "Multa por atraso de voo");
+        await InsertThemeAsync(16, "Cobrança de dívida");
+        await InsertThemeAsync(17, "Atraso de entrega de imóvel");
+        await InsertJudgedCasesAsync(15, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
+        await InsertJudgedCasesAsync(16, upheldCount: 4, rejectedCount: 1, dateSk: 20240615);
+        await InsertJudgedCasesAsync(17, upheldCount: 2, rejectedCount: 1, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var results = await TopThemesAsync(2);
+
+        Assert.Equal(["Cobrança de dívida", "Atraso de entrega de imóvel"], results.Select(theme => theme.ThemeName));
+    }
+
+    [Fact]
+    public async Task Reads_the_top_themes_with_their_strength_fields()
+    {
+        await InsertThemeAsync(18, "Multa por atraso de voo");
+        await InsertThemeAsync(19, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(18, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
+        await InsertJudgedCasesAsync(19, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var results = await _reader.TopThemesAsync(20, CancellationToken.None);
+
+        Assert.Equal([19L, 18L], results.Select(theme => theme.ThemeKey));
+        var theme = results[0];
+        Assert.Equal("Cobrança de dívida", theme.Name);
+        Assert.Equal(144, theme.JudgedCount);
+        Assert.Equal(80, theme.StrengthScore);
+        Assert.Equal("Dominante", theme.Level);
+        Assert.Equal(142, theme.Outcome.Upheld);
+        Assert.Equal(2, theme.Outcome.Rejected);
+        Assert.Equal(0.9861m, theme.Outcome.UpheldRatio);
+        Assert.Equal(new DateOnly(2024, 6, 15), theme.LastDecisionDate);
+    }
+
+    private sealed record TopTheme(long ThemeKey, string ThemeName, float? Rank, long Position);
 }
