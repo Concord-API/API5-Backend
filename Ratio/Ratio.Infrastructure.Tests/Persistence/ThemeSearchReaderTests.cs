@@ -94,6 +94,22 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
             new { dateSk, upheldCount, casePrefixPattern });
     }
 
+    private async Task InsertUnjudgedCaseAsync(long themeKey)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        var subjectCode = themeKey * 100;
+        var caseNumber = $"CASE-{themeKey}-unjudged";
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.dim_case (case_number, court_sk, court_level, source, extracted_at) " +
+            "SELECT @caseNumber, court_sk, 'First', 'datajud', now() FROM dw.dim_court LIMIT 1",
+            new { caseNumber });
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.bridge_case_subject (case_sk, subject_sk) " +
+            "SELECT dc.case_sk, s.subject_sk FROM dw.dim_case dc CROSS JOIN dw.dim_subject s " +
+            "WHERE dc.case_number = @caseNumber AND s.subject_code = @subjectCode",
+            new { caseNumber, subjectCode });
+    }
+
     [Fact]
     public async Task Joins_the_strength_fields_by_theme_key()
     {
@@ -134,6 +150,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     public async Task Returns_zero_score_and_no_last_decision_date_for_a_theme_without_judgments()
     {
         await InsertThemeAsync(3, "Tema sem julgamento algum");
+        await InsertUnjudgedCaseAsync(3);
         await RefreshAggregatesAsync();
 
         var theme = Assert.Single(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, CancellationToken.None));
@@ -150,6 +167,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     {
         await InsertThemeAsync(4, "Atraso de entrega de imóvel");
         await InsertThemeAsync(5, "Multa por atraso de voo");
+        await InsertUnjudgedCaseAsync(4);
         await InsertJudgedCasesAsync(5, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
