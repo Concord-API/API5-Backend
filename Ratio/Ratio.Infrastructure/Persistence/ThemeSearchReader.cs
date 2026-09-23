@@ -6,24 +6,35 @@ namespace Ratio.Infrastructure.Persistence;
 
 public sealed class ThemeSearchReader(NpgsqlDataSource dataSource) : IThemeSearchReader
 {
-    private const string Sql = """
+    private static readonly string SearchSql = Sql("dw.search_themes(@query, @limit)");
+
+    private static readonly string TopSql = Sql("dw.top_themes(@limit)");
+
+    private static string Sql(string source) => $"""
         SELECT s.theme_key AS ThemeKey, s.theme_name AS Name, s.subject_area AS SubjectArea,
                ts.judged AS Judged, ts.upheld AS Upheld, ts.rejected AS Rejected,
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage
-        FROM dw.search_themes(@query, @limit) s
+        FROM {source} s
         JOIN dw.dim_theme t ON t.theme_key = s.theme_key
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
         LEFT JOIN dw.strength_config cfg ON cfg.id = 1
         ORDER BY s.position
         """;
 
-    public async Task<IReadOnlyList<ThemeSummary>> SearchThemesAsync(
-        string? query, int limit, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<ThemeSummary>> SearchThemesAsync(
+        string? query, int limit, CancellationToken cancellationToken) =>
+        QueryAsync(SearchSql, new { query, limit }, cancellationToken);
+
+    public Task<IReadOnlyList<ThemeSummary>> TopThemesAsync(int limit, CancellationToken cancellationToken) =>
+        QueryAsync(TopSql, new { limit }, cancellationToken);
+
+    private async Task<IReadOnlyList<ThemeSummary>> QueryAsync(
+        string sql, object parameters, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         var rows = await connection.QueryAsync<ThemeSearchRow>(
-            new CommandDefinition(Sql, new { query, limit }, cancellationToken: cancellationToken));
+            new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
 
         return rows.Select(Map).ToArray();
     }
