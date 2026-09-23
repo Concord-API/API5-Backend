@@ -25,10 +25,26 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "dim_subject",
         "dim_theme",
         "fact_case_event",
+        "search_synonym",
         "strength_config"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "theme_strength", "theme_summary"];
+
+    private static readonly string[] Scripts =
+    [
+        "V001__dw_schema.sql",
+        "V002__portuguese_text_search.sql",
+        "V003__theme_search_columns.sql",
+        "V004__search_themes.sql",
+        "V005__theme_strength.sql",
+        "V006__search_synonyms.sql",
+        "V007__top_themes.sql",
+        "V008__search_only_judged_themes.sql"
+    ];
+
+    private static string[] ScriptFileNames(IEnumerable<string> names) =>
+        names.Select(name => name[(name.LastIndexOf(".V", StringComparison.Ordinal) + 1)..]).ToArray();
 
     private static DatabaseMigrator Migrator(string connectionString) =>
         new(connectionString, NullLogger<DatabaseMigrator>.Instance);
@@ -46,7 +62,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
 
         var applied = await Migrator(database).MigrateAsync(CancellationToken.None);
 
-        Assert.Collection(applied, script => Assert.EndsWith("V001__dw_schema.sql", script));
+        Assert.Equal(Scripts, ScriptFileNames(applied));
         Assert.Equal(Tables, await QueryAsync<string>(database,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dw' AND table_type = 'BASE TABLE' ORDER BY table_name"));
         Assert.Equal(MaterializedViews, await QueryAsync<string>(database,
@@ -72,8 +88,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
 
         await Migrator(database).MigrateAsync(CancellationToken.None);
 
-        var journal = await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions");
-        Assert.Collection(journal, script => Assert.EndsWith("V001__dw_schema.sql", script));
+        var journal = await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions ORDER BY schemaversionsid");
+        Assert.Equal(Scripts, ScriptFileNames(journal));
     }
 
     [Fact]
@@ -85,7 +101,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         var applied = await Migrator(database).MigrateAsync(CancellationToken.None);
 
         Assert.Empty(applied);
-        Assert.Single(await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions"));
+        Assert.Equal(Scripts.Length, (await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions")).Length);
     }
 
     [Fact]
@@ -97,8 +113,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
             Migrator(database).MigrateAsync(CancellationToken.None),
             Migrator(database).MigrateAsync(CancellationToken.None));
 
-        Assert.Single(runs.SelectMany(applied => applied));
-        Assert.Single(await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions"));
+        Assert.Equal(Scripts, ScriptFileNames(runs.SelectMany(applied => applied)));
+        Assert.Equal(Scripts.Length, (await QueryAsync<string>(database, "SELECT scriptname FROM migrations.schema_versions")).Length);
     }
 
     [Fact]
