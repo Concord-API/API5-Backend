@@ -7,6 +7,17 @@ namespace Ratio.Infrastructure.Tests.Migrations;
 
 public class QueryExpansionTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>, IAsyncLifetime
 {
+    private const string WrongfulListing = "Inscrição indevida em cadastro de inadimplentes";
+    private const string JargonPhrase = "fui negativado no serasa";
+
+    private static readonly string[] Themes =
+    [
+        WrongfulListing,
+        "Dano moral por negativação indevida",
+        "Contratos Bancários",
+        "Guarda compartilhada de filhos"
+    ];
+
     private NpgsqlDataSource _dataSource = null!;
 
     public async Task InitializeAsync()
@@ -25,10 +36,28 @@ public class QueryExpansionTests(PostgresFixture postgres) : IClassFixture<Postg
             "INSERT INTO dw.search_synonym (term, expands_to) VALUES ('negativado', 'inclusao indevida cadastro inadimplentes'), ('serasa', 'cadastro inadimplentes')");
     }
 
+    private async Task InsertThemesAsync()
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        foreach (var themeName in Themes)
+        {
+            await connection.ExecuteAsync(
+                "INSERT INTO dw.dim_theme (theme_name, theme_key) VALUES (@themeName, (SELECT coalesce(max(theme_key), 0) + 1 FROM dw.dim_theme))",
+                new { themeName });
+        }
+    }
+
     private async Task<string> ExpandAsync(string? query)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
         return await connection.ExecuteScalarAsync<string>("SELECT dw.expand_query(@query)", new { query }) ?? "";
+    }
+
+    private async Task<string[]> SearchAsync(string query)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        return (await connection.QueryAsync<string>(
+            "SELECT theme_name FROM dw.search_themes(@query)", new { query })).ToArray();
     }
 
     [Fact]
@@ -38,7 +67,28 @@ public class QueryExpansionTests(PostgresFixture postgres) : IClassFixture<Postg
 
         Assert.Equal(
             "fui inclusao indevida cadastro inadimplentes no cadastro inadimplentes",
-            await ExpandAsync("fui negativado no serasa"));
+            await ExpandAsync(JargonPhrase));
+    }
+
+    [Fact]
+    public async Task Finds_the_theme_first_from_a_phrase_with_jargon()
+    {
+        await InsertThemesAsync();
+        await InsertSynonymsAsync();
+
+        var results = await SearchAsync(JargonPhrase);
+
+        Assert.Equal(WrongfulListing, results.FirstOrDefault());
+    }
+
+    [Fact]
+    public async Task Does_not_find_the_theme_first_from_the_jargon_without_the_synonym()
+    {
+        await InsertThemesAsync();
+
+        var results = await SearchAsync(JargonPhrase);
+
+        Assert.NotEqual(WrongfulListing, results.FirstOrDefault());
     }
 
     [Fact]
