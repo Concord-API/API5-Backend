@@ -233,5 +233,28 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(["Cobrança de dívida", "Atraso de entrega de imóvel"], results.Select(theme => theme.ThemeName));
     }
 
+    [Fact]
+    public async Task Reads_the_top_themes_with_their_strength_fields()
+    {
+        await InsertThemeAsync(18, "Multa por atraso de voo");
+        await InsertThemeAsync(19, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(18, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
+        await InsertJudgedCasesAsync(19, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var results = await _reader.TopThemesAsync(20, CancellationToken.None);
+
+        Assert.Equal([19L, 18L], results.Select(theme => theme.ThemeKey));
+        var theme = results[0];
+        Assert.Equal("Cobrança de dívida", theme.Name);
+        Assert.Equal(144, theme.JudgedCount);
+        Assert.Equal(80, theme.StrengthScore);
+        Assert.Equal("Dominante", theme.Level);
+        Assert.Equal(142, theme.Outcome.Upheld);
+        Assert.Equal(2, theme.Outcome.Rejected);
+        Assert.Equal(0.9861m, theme.Outcome.UpheldRatio);
+        Assert.Equal(new DateOnly(2024, 6, 15), theme.LastDecisionDate);
+    }
+
     private sealed record TopTheme(long ThemeKey, string ThemeName, float? Rank, long Position);
 }
