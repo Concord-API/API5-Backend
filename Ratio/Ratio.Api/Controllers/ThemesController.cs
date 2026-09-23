@@ -17,6 +17,13 @@ public class ThemesController(IThemeSearchReader themeSearchReader) : Controller
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
+        if (q?.Trim().Length is > 0 and < 3)
+        {
+            return Problem(
+                detail: "Digite ao menos 3 caracteres para buscar.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
 
         return Ok(new { query = q, total = themes.Count, themes });
