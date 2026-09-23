@@ -264,5 +264,34 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(new DateOnly(2024, 6, 15), theme.LastDecisionDate);
     }
 
+    [Fact]
+    public async Task Reports_only_the_judged_cases_as_the_judged_count()
+    {
+        await InsertThemeAsync(30, "Cobrança de dívida prescrita");
+        await InsertJudgedCasesAsync(30, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
+        await InsertUnjudgedCaseAsync(30);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida prescrita", 20, CancellationToken.None));
+
+        Assert.Equal(144, theme.JudgedCount);
+    }
+
+    [Fact]
+    public async Task Ranks_a_split_high_volume_theme_below_a_consistent_one()
+    {
+        await InsertThemeAsync(31, "Cobrança de tarifa bancária");
+        await InsertThemeAsync(32, "Cobrança de seguro prestamista");
+        await InsertJudgedCasesAsync(31, upheldCount: 500, rejectedCount: 500, dateSk: 20240615);
+        await InsertJudgedCasesAsync(32, upheldCount: 38, rejectedCount: 2, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var results = await _reader.SearchThemesAsync("cobranca", 20, CancellationToken.None);
+
+        Assert.Equal(["Cobrança de seguro prestamista", "Cobrança de tarifa bancária"], results.Select(theme => theme.Name));
+        Assert.Equal([71, 40], results.Select(theme => theme.StrengthScore ?? -1));
+        Assert.Equal([40L, 1000L], results.Select(theme => theme.JudgedCount));
+    }
+
     private sealed record TopTheme(long ThemeKey, string ThemeName, float? Rank, long Position);
 }
