@@ -128,15 +128,23 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
             "SELECT theme_key FROM dw.dim_theme WHERE theme_name = @themeName", new { themeName });
     }
 
+    private async Task<int> StrengthScoreAsync(string themeName)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        return await connection.ExecuteScalarAsync<int>(
+            "SELECT s.score FROM dw.theme_strength s JOIN dw.dim_theme t ON t.theme_sk = s.theme_sk WHERE t.theme_name = @themeName",
+            new { themeName });
+    }
+
     [Theory]
     [InlineData("inscrição indevida")]
     [InlineData("inscricao indevida")]
-    public async Task Finds_the_same_theme_first_with_or_without_accents(string query)
+    public async Task Finds_the_same_theme_with_or_without_accents(string query)
     {
         var results = await SearchAsync(query);
 
-        Assert.Equal(WrongfulListing, results[0].ThemeName);
-        Assert.Equal(await ThemeKeyAsync(WrongfulListing), results[0].ThemeKey);
+        var result = Assert.Single(results, result => result.ThemeName == WrongfulListing);
+        Assert.Equal(await ThemeKeyAsync(WrongfulListing), result.ThemeKey);
     }
 
     [Fact]
@@ -163,16 +171,18 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
     }
 
     [Fact]
-    public async Task Positions_the_themes_by_rank_descending()
+    public async Task Positions_the_themes_by_strength_score_descending()
     {
         var results = await SearchAsync("inscricao indevida");
 
-        Assert.Equal([WrongfulListing, WrongfulNegativeRecord], results.Select(result => result.ThemeName));
+        Assert.True(results[0].Rank < results[1].Rank);
+        Assert.True(await StrengthScoreAsync(results[0].ThemeName) > await StrengthScoreAsync(results[1].ThemeName));
+        Assert.Equal([WrongfulNegativeRecord, WrongfulListing], results.Select(result => result.ThemeName));
         Assert.Equal([1L, 2L], results.Select(result => result.Position));
     }
 
     [Fact]
-    public async Task Breaks_rank_ties_by_theme_name()
+    public async Task Breaks_strength_ties_by_theme_name()
     {
         await InsertThemesAsync(["Multa por atraso de voo", "Atraso de entrega de imóvel"]);
         await InsertJudgedCasesAsync("Multa por atraso de voo", upheldCount: 1, rejectedCount: 0);
@@ -181,17 +191,17 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
 
         var results = await SearchAsync("atraso");
 
-        Assert.Equal(results[0].Rank, results[1].Rank);
+        Assert.Equal(await StrengthScoreAsync(results[0].ThemeName), await StrengthScoreAsync(results[1].ThemeName));
         Assert.Equal(["Atraso de entrega de imóvel", "Multa por atraso de voo"], results.Select(result => result.ThemeName));
         Assert.Equal([1L, 2L], results.Select(result => result.Position));
     }
 
     [Fact]
-    public async Task Cuts_the_results_at_the_limit()
+    public async Task Cuts_the_results_at_the_limit_after_ordering_by_strength()
     {
         var results = await SearchAsync("inscricao indevida", 1);
 
-        Assert.Equal([WrongfulListing], results.Select(result => result.ThemeName));
+        Assert.Equal([WrongfulNegativeRecord], results.Select(result => result.ThemeName));
     }
 
     [Fact]

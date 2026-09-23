@@ -138,6 +138,20 @@ public class QueryExpansionTests(PostgresFixture postgres) : IClassFixture<Postg
     }
 
     [Fact]
+    public async Task Orders_the_themes_found_from_jargon_by_strength_score()
+    {
+        const string KeptListing = "Manutenção indevida em cadastro de inadimplentes";
+        await InsertThemeAsync(WrongfulListing, upheldCount: 1, rejectedCount: 1);
+        await InsertThemeAsync(KeptListing, upheldCount: 10, rejectedCount: 0);
+        await RefreshAggregatesAsync();
+        await InsertSynonymsAsync();
+
+        var results = await SearchAsync(JargonPhrase);
+
+        Assert.Equal([KeptListing, WrongfulListing], results);
+    }
+
+    [Fact]
     public async Task Normalizes_the_word_before_looking_up_the_synonym()
     {
         await InsertSynonymsAsync();

@@ -165,7 +165,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     }
 
     [Fact]
-    public async Task Orders_by_the_search_position_instead_of_the_strength_score()
+    public async Task Orders_by_the_strength_score_instead_of_the_theme_name()
     {
         await InsertThemeAsync(4, "Atraso de entrega de imóvel");
         await InsertThemeAsync(5, "Multa por atraso de voo");
@@ -175,8 +175,8 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
 
         var results = await _reader.SearchThemesAsync("atraso", 20, CancellationToken.None);
 
-        Assert.Equal(["Atraso de entrega de imóvel", "Multa por atraso de voo"], results.Select(theme => theme.Name));
-        Assert.True(results[0].StrengthScore < results[1].StrengthScore);
+        Assert.Equal(["Multa por atraso de voo", "Atraso de entrega de imóvel"], results.Select(theme => theme.Name));
+        Assert.True(results[0].StrengthScore > results[1].StrengthScore);
     }
 
     [Fact]
