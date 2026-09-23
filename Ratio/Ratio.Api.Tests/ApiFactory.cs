@@ -11,6 +11,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public Mock<ILastExtractionReader> LastExtractionReader { get; } = new();
 
+    public Mock<IThemeSearchReader> ThemeSearchReader { get; } = new();
+
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
     public ApiFactory() =>
@@ -23,6 +25,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton(LastExtractionReader.Object);
+            services.AddSingleton(ThemeSearchReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });
