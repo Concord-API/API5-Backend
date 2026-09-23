@@ -264,5 +264,18 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(new DateOnly(2024, 6, 15), theme.LastDecisionDate);
     }
 
+    [Fact]
+    public async Task Reports_only_the_judged_cases_as_the_judged_count()
+    {
+        await InsertThemeAsync(30, "Cobrança de dívida prescrita");
+        await InsertJudgedCasesAsync(30, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
+        await InsertUnjudgedCaseAsync(30);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida prescrita", 20, CancellationToken.None));
+
+        Assert.Equal(144, theme.JudgedCount);
+    }
+
     private sealed record TopTheme(long ThemeKey, string ThemeName, float? Rank, long Position);
 }
