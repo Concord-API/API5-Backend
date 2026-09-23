@@ -17,9 +17,10 @@ $$
            r.theme_name,
            r.subject_area,
            r.rank,
-           row_number() OVER (ORDER BY r.rank DESC, r.theme_name) AS position
+           row_number() OVER (ORDER BY ts.score DESC, r.theme_name) AS position
     FROM ranked r
     JOIN dw.theme_summary s ON s.theme_sk = r.theme_sk
+    JOIN dw.theme_strength ts ON ts.theme_sk = r.theme_sk
     WHERE r.rank >= 0.5
       AND s.judged_case_count > 0
     ORDER BY position
