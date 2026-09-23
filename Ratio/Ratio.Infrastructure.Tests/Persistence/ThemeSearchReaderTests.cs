@@ -228,6 +228,20 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     }
 
     [Fact]
+    public async Task Leaves_out_themes_without_judgments_from_the_top_themes()
+    {
+        await InsertThemeAsync(20, "Cobrança de dívida");
+        await InsertThemeAsync(21, "Tema sem julgamento algum");
+        await InsertJudgedCasesAsync(20, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
+        await InsertUnjudgedCaseAsync(21);
+        await RefreshAggregatesAsync();
+
+        var results = await TopThemesAsync(20);
+
+        Assert.Equal(["Cobrança de dívida"], results.Select(theme => theme.ThemeName));
+    }
+
+    [Fact]
     public async Task Reads_the_top_themes_with_their_strength_fields()
     {
         await InsertThemeAsync(18, "Multa por atraso de voo");
