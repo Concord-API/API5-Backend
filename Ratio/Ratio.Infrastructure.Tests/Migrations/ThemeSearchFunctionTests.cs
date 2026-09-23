@@ -182,6 +182,34 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
     }
 
     [Fact]
+    public async Task Orders_matching_themes_by_strength_before_applying_the_limit()
+    {
+        var results = await SearchAsync("inscricao indevida");
+        var limitedResults = await SearchAsync("inscricao indevida", 1);
+
+        Assert.True(results[0].Rank < results[1].Rank);
+        Assert.True(await StrengthScoreAsync(results[0].ThemeName) > await StrengthScoreAsync(results[1].ThemeName));
+        Assert.Equal([WrongfulNegativeRecord, WrongfulListing], results.Select(result => result.ThemeName));
+        Assert.Equal([1L, 2L], results.Select(result => result.Position));
+        Assert.Equal([WrongfulNegativeRecord], limitedResults.Select(result => result.ThemeName));
+    }
+
+    [Fact]
+    public async Task Breaks_strength_ties_by_decision_volume()
+    {
+        await InsertThemesAsync(["Multa por atraso de voo", "Atraso de entrega de imóvel"]);
+        await InsertJudgedCasesAsync("Multa por atraso de voo", upheldCount: 20, rejectedCount: 0);
+        await InsertJudgedCasesAsync("Atraso de entrega de imóvel", upheldCount: 10, rejectedCount: 0);
+        await RefreshAggregatesAsync();
+
+        var results = await SearchAsync("atraso");
+
+        Assert.Equal(await StrengthScoreAsync(results[0].ThemeName), await StrengthScoreAsync(results[1].ThemeName));
+        Assert.Equal(["Multa por atraso de voo", "Atraso de entrega de imóvel"], results.Select(result => result.ThemeName));
+        Assert.Equal([1L, 2L], results.Select(result => result.Position));
+    }
+
+    [Fact]
     public async Task Breaks_strength_ties_by_theme_name()
     {
         await InsertThemesAsync(["Multa por atraso de voo", "Atraso de entrega de imóvel"]);
