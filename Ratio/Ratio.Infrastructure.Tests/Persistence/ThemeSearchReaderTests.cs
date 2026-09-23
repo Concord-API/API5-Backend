@@ -155,34 +155,28 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     }
 
     [Fact]
-    public async Task Returns_zero_score_and_no_last_decision_date_for_a_theme_without_judgments()
+    public async Task Leaves_out_a_theme_without_judgments()
     {
         await InsertThemeAsync(3, "Tema sem julgamento algum");
         await InsertUnjudgedCaseAsync(3);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, CancellationToken.None));
-
-        Assert.Equal(0, theme.JudgedCount);
-        Assert.Equal(0, theme.StrengthScore);
-        Assert.Equal("Divergente", theme.Level);
-        Assert.Null(theme.Outcome.UpheldRatio);
-        Assert.Null(theme.LastDecisionDate);
+        Assert.Empty(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, CancellationToken.None));
     }
 
     [Fact]
-    public async Task Orders_by_the_search_position_instead_of_the_strength_score()
+    public async Task Orders_by_the_strength_score_instead_of_the_theme_name()
     {
         await InsertThemeAsync(4, "Atraso de entrega de imóvel");
         await InsertThemeAsync(5, "Multa por atraso de voo");
-        await InsertUnjudgedCaseAsync(4);
+        await InsertJudgedCasesAsync(4, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
         await InsertJudgedCasesAsync(5, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
         var results = await _reader.SearchThemesAsync("atraso", 20, CancellationToken.None);
 
-        Assert.Equal(["Atraso de entrega de imóvel", "Multa por atraso de voo"], results.Select(theme => theme.Name));
-        Assert.True(results[0].StrengthScore < results[1].StrengthScore);
+        Assert.Equal(["Multa por atraso de voo", "Atraso de entrega de imóvel"], results.Select(theme => theme.Name));
+        Assert.True(results[0].StrengthScore > results[1].StrengthScore);
     }
 
     [Fact]
@@ -231,6 +225,20 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         var results = await TopThemesAsync(2);
 
         Assert.Equal(["Cobrança de dívida", "Atraso de entrega de imóvel"], results.Select(theme => theme.ThemeName));
+    }
+
+    [Fact]
+    public async Task Leaves_out_themes_without_judgments_from_the_top_themes()
+    {
+        await InsertThemeAsync(20, "Cobrança de dívida");
+        await InsertThemeAsync(21, "Tema sem julgamento algum");
+        await InsertJudgedCasesAsync(20, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
+        await InsertUnjudgedCaseAsync(21);
+        await RefreshAggregatesAsync();
+
+        var results = await TopThemesAsync(20);
+
+        Assert.Equal(["Cobrança de dívida"], results.Select(theme => theme.ThemeName));
     }
 
     [Fact]
