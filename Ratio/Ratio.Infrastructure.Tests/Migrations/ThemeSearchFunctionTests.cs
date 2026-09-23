@@ -25,6 +25,8 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
         "SELECT 219, 'Procedência', outcome_sk, true, 'pretensao_autor' FROM dw.dim_decision_outcome WHERE outcome_code = 'Granted'; " +
         "INSERT INTO dw.dim_movement (movement_code, movement_name, outcome_sk, code_verified, polarity_reference) " +
         "SELECT 220, 'Improcedência', outcome_sk, true, 'pretensao_autor' FROM dw.dim_decision_outcome WHERE outcome_code = 'Denied'; " +
+        "INSERT INTO dw.dim_movement (movement_code, movement_name, outcome_sk, code_verified) " +
+        "SELECT 237, 'Provimento', outcome_sk, false FROM dw.dim_decision_outcome WHERE outcome_code = 'Granted'; " +
         "INSERT INTO dw.dim_court (court_code, court_name, state_uf) VALUES ('TJSP', 'Tribunal de Justiça de São Paulo', 'SP'); " +
         "INSERT INTO dw.dim_case_class (class_name, claimant_type) VALUES ('Ação de indenização', 'autor_particular'); " +
         "INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day) VALUES (20250615, '2025-06-15', 2025, 2, 6, 'Junho', 15);";
@@ -91,6 +93,23 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
             "JOIN dw.dim_movement m ON m.movement_code = CASE WHEN right(dc.case_number, 6)::int <= @upheldCount THEN 219 ELSE 220 END " +
             "WHERE t.theme_name = @themeName",
             new { themeName, upheldCount, caseCount = upheldCount + rejectedCount });
+    }
+
+    private async Task InsertUnverifiedCaseAsync(string themeName)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.dim_case (case_number, court_sk, case_class_sk, court_level, source, extracted_at) " +
+            "SELECT 'CASE-' || t.theme_key || '-unverified', c.court_sk, cc.case_class_sk, 'First', 'datajud', now() " +
+            "FROM dw.dim_theme t CROSS JOIN dw.dim_court c CROSS JOIN dw.dim_case_class cc WHERE t.theme_name = @themeName; " +
+            "INSERT INTO dw.bridge_case_subject (case_sk, subject_sk) " +
+            "SELECT dc.case_sk, s.subject_sk FROM dw.dim_theme t JOIN dw.dim_subject s ON s.subject_code = t.theme_key * 100 " +
+            "JOIN dw.dim_case dc ON dc.case_number = 'CASE-' || t.theme_key || '-unverified' WHERE t.theme_name = @themeName; " +
+            "INSERT INTO dw.fact_case_event (case_sk, court_sk, movement_sk, date_sk, occurred_at, source_url, extracted_at, natural_key) " +
+            "SELECT dc.case_sk, dc.court_sk, m.movement_sk, 20250615, TIMESTAMPTZ '2025-06-15', 'https://example.org', now(), 'evt:' || dc.case_sk " +
+            "FROM dw.dim_theme t JOIN dw.dim_case dc ON dc.case_number = 'CASE-' || t.theme_key || '-unverified' " +
+            "JOIN dw.dim_movement m ON m.movement_code = 237 WHERE t.theme_name = @themeName",
+            new { themeName });
     }
 
     private async Task<SearchedTheme[]> SearchAsync(string? query, int? limit = null)
@@ -173,6 +192,28 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
         var results = await SearchAsync("inscricao indevida", 1);
 
         Assert.Equal([WrongfulListing], results.Select(result => result.ThemeName));
+    }
+
+    [Fact]
+    public async Task Leaves_out_a_theme_whose_cases_have_no_verified_outcome()
+    {
+        await InsertThemesAsync(["Atraso de entrega de imóvel", "Atraso na entrega de imóvel na planta"]);
+        await InsertJudgedCasesAsync("Atraso de entrega de imóvel", upheldCount: 1, rejectedCount: 0);
+        await InsertUnverifiedCaseAsync("Atraso na entrega de imóvel na planta");
+        await RefreshAggregatesAsync();
+
+        var results = await SearchAsync("atraso entrega imovel");
+
+        Assert.Equal(["Atraso de entrega de imóvel"], results.Select(result => result.ThemeName));
+    }
+
+    [Fact]
+    public async Task Leaves_out_a_theme_without_cases()
+    {
+        await InsertThemesAsync(["Atraso de entrega de imóvel"]);
+        await RefreshAggregatesAsync();
+
+        Assert.Empty(await SearchAsync("atraso entrega imovel"));
     }
 
     [Fact]

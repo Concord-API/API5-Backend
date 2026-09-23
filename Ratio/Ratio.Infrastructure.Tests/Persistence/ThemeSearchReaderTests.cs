@@ -155,19 +155,13 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     }
 
     [Fact]
-    public async Task Returns_zero_score_and_no_last_decision_date_for_a_theme_without_judgments()
+    public async Task Leaves_out_a_theme_without_judgments()
     {
         await InsertThemeAsync(3, "Tema sem julgamento algum");
         await InsertUnjudgedCaseAsync(3);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, CancellationToken.None));
-
-        Assert.Equal(0, theme.JudgedCount);
-        Assert.Equal(0, theme.StrengthScore);
-        Assert.Equal("Divergente", theme.Level);
-        Assert.Null(theme.Outcome.UpheldRatio);
-        Assert.Null(theme.LastDecisionDate);
+        Assert.Empty(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, CancellationToken.None));
     }
 
     [Fact]
@@ -175,7 +169,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     {
         await InsertThemeAsync(4, "Atraso de entrega de imóvel");
         await InsertThemeAsync(5, "Multa por atraso de voo");
-        await InsertUnjudgedCaseAsync(4);
+        await InsertJudgedCasesAsync(4, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
         await InsertJudgedCasesAsync(5, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
