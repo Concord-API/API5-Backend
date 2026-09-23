@@ -105,4 +105,37 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal("O parâmetro 'limit' deve estar entre 1 e 100.", body.GetProperty("detail").GetString());
     }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("ab")]
+    [InlineData("  a  ")]
+    public async Task Rejects_a_query_shorter_than_3_characters(string query)
+    {
+        var response = await _client.GetAsync($"/api/themes?q={Uri.EscapeDataString(query)}");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("https://tools.ietf.org/html/rfc9110#section-15.5.1", body.GetProperty("type").GetString());
+        Assert.Equal("Requisição inválida", body.GetProperty("title").GetString());
+        Assert.Equal(400, body.GetProperty("status").GetInt32());
+        Assert.Equal("Digite ao menos 3 caracteres para buscar.", body.GetProperty("detail").GetString());
+        factory.ThemeSearchReader.Verify(
+            reader => reader.SearchThemesAsync(query, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Searches_a_query_with_3_characters()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("abc", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await _client.GetAsync("/api/themes?q=abc");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        factory.ThemeSearchReader.Verify(
+            reader => reader.SearchThemesAsync("abc", 20, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
