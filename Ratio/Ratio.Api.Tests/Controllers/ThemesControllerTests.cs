@@ -40,9 +40,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         new DateOnly(2026, 8, 30),
         new ThemeNarrative(Lead, Body, "template", "1.0", new DateOnly(2026, 9, 23)));
 
-    private static readonly LoadedProvenance LoadedCases = new(
-        [new LoadedSource("cases", "datajud", new DateTimeOffset(2026, 8, 28, 10, 0, 0, TimeSpan.Zero), 12418)],
-        "1.0");
+    private static readonly LoadedProvenance LoadedCases = ApiFactory.LoadedCases;
 
     private static void AssertDescribesLoadedCases(JsonElement provenance)
     {
@@ -69,6 +67,26 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/417");
 
         AssertDescribesLoadedCases(body.GetProperty("provenance"));
+    }
+
+    [Fact]
+    public async Task Omits_the_summary_when_the_cases_have_no_provenance()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(418, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 418 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(418, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedProvenance.Empty);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/418");
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("summary").ValueKind);
+        Assert.Empty(body.GetProperty("provenance").GetProperty("sources").EnumerateArray());
+        var summary = Assert.Single(
+            body.GetProperty("unavailable").EnumerateArray(),
+            item => item.GetProperty("block").GetString() == "summary");
+        Assert.Equal("notLoaded", summary.GetProperty("reason").GetString());
     }
 
     [Fact]

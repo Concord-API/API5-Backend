@@ -23,10 +23,12 @@ public class ThemesController(
         }
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
+        var summary = provenance.Covers("cases") ? theme.Summary : null;
 
         return Ok(theme with
         {
-            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, theme.Summary is not null),
+            Summary = summary,
+            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null),
             Provenance = provenance
         });
     }
