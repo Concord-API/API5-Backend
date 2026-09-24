@@ -44,7 +44,7 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
         var database = await postgres.CreateDatabaseAsync();
         await new DatabaseMigrator(database, NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
         _dataSource = NpgsqlDataSource.Create(database);
-        _reader = new ThemeDetailReader(_dataSource);
+        _reader = new ThemeDetailReader(_dataSource, NullLogger<ThemeDetailReader>.Instance);
         await ExecuteAsync(WarehouseData);
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.case_current_result");
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_summary");
