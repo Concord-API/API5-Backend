@@ -36,7 +36,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         var database = await _postgres.CreateDatabaseAsync();
         await new DatabaseMigrator(database, NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
         _dataSource = NpgsqlDataSource.Create(database);
-        _reader = new ThemeSearchReader(_dataSource);
+        _reader = new ThemeSearchReader(_dataSource, NullLogger<ThemeSearchReader>.Instance);
         await ExecuteAsync(Config + Outcomes + CourtAndClass + Dates);
     }
 
@@ -116,6 +116,24 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
             "SELECT dc.case_sk, s.subject_sk FROM dw.dim_case dc CROSS JOIN dw.dim_subject s " +
             "WHERE dc.case_number = @caseNumber AND s.subject_code = @subjectCode",
             new { caseNumber, subjectCode });
+    }
+
+    [Fact]
+    public async Task Returns_no_themes_when_the_warehouse_was_never_loaded()
+    {
+        await InsertThemeAsync(30, "Cobrança de dívida");
+
+        var results = await _reader.SearchThemesAsync("cobranca de divida", 20, CancellationToken.None);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task Returns_no_top_themes_when_the_warehouse_was_never_loaded()
+    {
+        var results = await _reader.TopThemesAsync(20, CancellationToken.None);
+
+        Assert.Empty(results);
     }
 
     [Fact]

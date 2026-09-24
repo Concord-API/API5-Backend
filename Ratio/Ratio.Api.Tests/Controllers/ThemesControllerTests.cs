@@ -10,6 +10,12 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
 {
     private readonly HttpClient _client = factory.CreateClient();
 
+    private static readonly JsonElement[] Lead = JsonSerializer.Deserialize<JsonElement[]>(
+        """[{"text":"Em "},{"ratio":0.9861,"n":144,"unit":"decisões"},{"text":" julgadas, houve acolhimento da pretensão do autor."}]""")!;
+
+    private static readonly JsonElement[] Body = JsonSerializer.Deserialize<JsonElement[]>(
+        """[{"text":"As decisões vêm de 3 tribunais, entre 2021 e 2026."}]""")!;
+
     private static readonly ThemeSummary WrongfulListing = new(
         412,
         "Inscrição indevida em cadastro de inadimplentes",
@@ -19,6 +25,145 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         "Dominante",
         new ThemeOutcome(142, 2, 0.9861m, "acolhimento da pretensão do autor"),
         new DateOnly(2026, 8, 30));
+
+    private static readonly ThemeDetail WrongfulListingDetail = new(
+        412,
+        "Inscrição indevida em cadastro de inadimplentes",
+        "CONSUMIDOR",
+        78,
+        "Dominante",
+        203,
+        144,
+        3,
+        2021,
+        2026,
+        new DateOnly(2026, 8, 30),
+        new ThemeNarrative(Lead, Body, "template", "1.0", new DateOnly(2026, 9, 23)));
+
+    [Fact]
+    public async Task Returns_the_theme_header_and_narrative_by_public_key()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(412, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail);
+
+        var response = await _client.GetAsync("/api/themes/412");
+        var rawBody = await response.Content.ReadAsStringAsync();
+        var body = JsonDocument.Parse(rawBody).RootElement;
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("theme_sk", rawBody);
+        Assert.DoesNotContain("themeSk", rawBody);
+        Assert.Equal(412, body.GetProperty("themeKey").GetInt64());
+        Assert.Equal("Inscrição indevida em cadastro de inadimplentes", body.GetProperty("name").GetString());
+        Assert.Equal("CONSUMIDOR", body.GetProperty("subjectArea").GetString());
+        Assert.Equal(78, body.GetProperty("strengthScore").GetInt32());
+        Assert.Equal("Dominante", body.GetProperty("level").GetString());
+        Assert.Equal(203, body.GetProperty("caseCount").GetInt64());
+        Assert.Equal(144, body.GetProperty("judgedCount").GetInt64());
+        Assert.Equal(3, body.GetProperty("courtCount").GetInt64());
+        Assert.Equal(2021, body.GetProperty("periodStartYear").GetInt32());
+        Assert.Equal(2026, body.GetProperty("periodEndYear").GetInt32());
+        Assert.Equal("2026-08-30", body.GetProperty("lastDecisionDate").GetString());
+
+        var summary = body.GetProperty("summary");
+        Assert.Equal("Em ", summary.GetProperty("lead")[0].GetProperty("text").GetString());
+        Assert.Equal(0.9861m, summary.GetProperty("lead")[1].GetProperty("ratio").GetDecimal());
+        Assert.Equal(144, summary.GetProperty("lead")[1].GetProperty("n").GetInt64());
+        Assert.Equal("decisões", summary.GetProperty("lead")[1].GetProperty("unit").GetString());
+        Assert.Equal("As decisões vêm de 3 tribunais, entre 2021 e 2026.", summary.GetProperty("body")[0].GetProperty("text").GetString());
+        Assert.Equal("template", summary.GetProperty("textOrigin").GetString());
+        Assert.Equal("1.0", summary.GetProperty("methodologyVersion").GetString());
+        Assert.Equal("2026-09-23", summary.GetProperty("generatedAt").GetString());
+        factory.ThemeDetailReader.Verify(
+            reader => reader.GetThemeAsync(412, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Returns_a_null_summary_when_the_theme_has_no_narrative()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(413, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 413, Summary = null });
+
+        var response = await _client.GetAsync("/api/themes/413");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("summary").ValueKind);
+    }
+
+    private async Task<JsonElement[]> UnavailableOfAsync(ThemeDetail detail)
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(detail.ThemeKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(detail);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>($"/api/themes/{detail.ThemeKey}");
+        return body.GetProperty("unavailable").EnumerateArray().ToArray();
+    }
+
+    [Fact]
+    public async Task Returns_the_sourceless_blocks_as_unavailable()
+    {
+        var unavailable = await UnavailableOfAsync(WrongfulListingDetail with { ThemeKey = 414 });
+
+        Assert.Equal(
+            ["caseLawCitation", "citedDecisions", "amountAwarded", "reporterJudge"],
+            unavailable.Select(item => item.GetProperty("block").GetString()));
+        Assert.All(unavailable, item => Assert.Equal("sourceUnavailable", item.GetProperty("reason").GetString()));
+        Assert.All(unavailable, item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("message").GetString())));
+    }
+
+    [Fact]
+    public async Task Explains_a_summary_not_loaded_yet_for_a_judged_theme()
+    {
+        var unavailable = await UnavailableOfAsync(WrongfulListingDetail with { ThemeKey = 415, Summary = null });
+
+        var summary = Assert.Single(unavailable, item => item.GetProperty("block").GetString() == "summary");
+        Assert.Equal("notLoaded", summary.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task Explains_that_a_summary_does_not_apply_to_a_theme_without_judged_cases()
+    {
+        var unavailable = await UnavailableOfAsync(
+            WrongfulListingDetail with { ThemeKey = 416, JudgedCount = 0, Summary = null });
+
+        var summary = Assert.Single(unavailable, item => item.GetProperty("block").GetString() == "summary");
+        Assert.Equal("notApplicable", summary.GetProperty("reason").GetString());
+    }
+
+    [Theory]
+    [InlineData(999999)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Returns_not_found_for_an_unknown_theme_key(long key)
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThemeDetail?)null);
+
+        var response = await _client.GetAsync($"/api/themes/{key}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Recurso não encontrado", body.GetProperty("title").GetString());
+        Assert.Equal("Tema não encontrado.", body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_not_found_without_detail_for_a_non_numeric_key()
+    {
+        var response = await _client.GetAsync("/api/themes/abc");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Recurso não encontrado", body.GetProperty("title").GetString());
+        Assert.False(body.TryGetProperty("detail", out _));
+    }
 
     [Fact]
     public async Task Returns_the_contract_shape_with_theme_key_never_theme_sk()
@@ -75,6 +220,21 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         var response = await _client.GetAsync("/api/themes?q=satelite");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
+        Assert.Equal(0, body.GetProperty("total").GetInt32());
+        Assert.Empty(body.GetProperty("themes").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Returns_no_top_themes_as_an_empty_list()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await _client.GetAsync("/api/themes?limit=7");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(0, body.GetProperty("total").GetInt32());
         Assert.Empty(body.GetProperty("themes").EnumerateArray());
     }

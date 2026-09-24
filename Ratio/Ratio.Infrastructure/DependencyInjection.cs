@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
         services.AddSingleton<ILastExtractionReader, LastExtractionReader>();
         services.AddSingleton<IThemeSearchReader, ThemeSearchReader>();
+        services.AddSingleton<IThemeDetailReader, ThemeDetailReader>();
         services.AddSingleton<IDatabaseMigrator>(provider =>
             new DatabaseMigrator(connectionString, provider.GetRequiredService<ILogger<DatabaseMigrator>>()));
         return services;
