@@ -15,4 +15,11 @@ public static class UnavailableBlocks
         new("reporterJudge", UnavailableReason.SourceUnavailable,
             "O DataJud não publica o relator.")
     ];
+
+    public static UnavailableBlock Summary(long judgedCount) =>
+        judgedCount == 0
+            ? new("summary", UnavailableReason.NotApplicable,
+                "Este tema não tem decisões julgadas, então não há entendimento para descrever.")
+            : new("summary", UnavailableReason.NotLoaded,
+                "O texto deste tema ainda não foi gerado; ele sai na próxima carga.");
 }
