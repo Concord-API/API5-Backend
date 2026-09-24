@@ -77,6 +77,30 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Returns_the_scope_with_the_search()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("negativacao", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=negativacao");
+
+        AssertDeclaresTheScope(body.GetProperty("scope"));
+    }
+
+    [Fact]
+    public async Task Returns_the_scope_with_the_top_themes()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(11, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=11");
+
+        AssertDeclaresTheScope(body.GetProperty("scope"));
+    }
+
+    [Fact]
     public async Task Returns_the_provenance_of_the_theme()
     {
         factory.ThemeDetailReader
