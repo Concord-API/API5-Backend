@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Dapper;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Ratio.Application.Abstractions;
 
 namespace Ratio.Infrastructure.Persistence;
 
-public sealed class ThemeDetailReader(NpgsqlDataSource dataSource) : IThemeDetailReader
+public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<ThemeDetailReader> logger) : IThemeDetailReader
 {
     private const string Sql = """
         SELECT t.theme_key AS ThemeKey, t.theme_name AS Name, t.subject_area AS SubjectArea,
@@ -24,11 +25,19 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource) : IThemeDetai
 
     public async Task<ThemeDetail?> GetThemeAsync(long themeKey, CancellationToken cancellationToken)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        var row = await connection.QuerySingleOrDefaultAsync<ThemeDetailRow>(
-            new CommandDefinition(Sql, new { themeKey }, cancellationToken: cancellationToken));
+        try
+        {
+            await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+            var row = await connection.QuerySingleOrDefaultAsync<ThemeDetailRow>(
+                new CommandDefinition(Sql, new { themeKey }, cancellationToken: cancellationToken));
 
-        return row is null ? null : Map(row);
+            return row is null ? null : Map(row);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+        {
+            logger.LogWarning(exception, "As views do DW não foram populadas: a carga ainda não foi aplicada neste banco.");
+            return null;
+        }
     }
 
     private static ThemeDetail Map(ThemeDetailRow row) =>
