@@ -46,4 +46,15 @@ public class DependencyInjectionTests
 
         Assert.IsType<ThemeDetailReader>(provider.GetRequiredService<IThemeDetailReader>());
     }
+
+    [Fact]
+    public void Registers_the_provenance_reader()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<ProvenanceReader>(provider.GetRequiredService<IProvenanceReader>());
+    }
 }
