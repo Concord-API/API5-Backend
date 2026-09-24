@@ -40,6 +40,67 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         new DateOnly(2026, 8, 30),
         new ThemeNarrative(Lead, Body, "template", "1.0", new DateOnly(2026, 9, 23)));
 
+    private static readonly LoadedProvenance LoadedCases = new(
+        [new LoadedSource("cases", "datajud", new DateTimeOffset(2026, 8, 28, 10, 0, 0, TimeSpan.Zero), 12418)],
+        "1.0");
+
+    private static void AssertDescribesLoadedCases(JsonElement provenance)
+    {
+        var source = Assert.Single(provenance.GetProperty("sources").EnumerateArray());
+        Assert.Equal("cases", source.GetProperty("block").GetString());
+        Assert.Equal("datajud", source.GetProperty("source").GetString());
+        Assert.Equal("DataJud/CNJ", source.GetProperty("name").GetString());
+        Assert.Equal("https://www.cnj.jus.br/sistemas/datajud/", source.GetProperty("sourceUrl").GetString());
+        Assert.Equal("2026-08-28T10:00:00+00:00", source.GetProperty("extractedAt").GetString());
+        Assert.Equal(12418, source.GetProperty("count").GetInt64());
+        Assert.Equal("1.0", provenance.GetProperty("methodologyVersion").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_the_provenance_of_the_theme()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(417, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 417 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(417, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCases);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/417");
+
+        AssertDescribesLoadedCases(body.GetProperty("provenance"));
+    }
+
+    [Fact]
+    public async Task Returns_the_global_provenance_with_the_search()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCases);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=cadastro");
+
+        AssertDescribesLoadedCases(body.GetProperty("provenance"));
+    }
+
+    [Fact]
+    public async Task Returns_the_global_provenance_with_the_top_themes()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCases);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes");
+
+        AssertDescribesLoadedCases(body.GetProperty("provenance"));
+    }
+
     [Fact]
     public async Task Returns_the_theme_header_and_narrative_by_public_key()
     {
