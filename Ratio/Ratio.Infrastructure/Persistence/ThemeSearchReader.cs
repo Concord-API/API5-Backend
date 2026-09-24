@@ -1,10 +1,11 @@
 using Dapper;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Ratio.Application.Abstractions;
 
 namespace Ratio.Infrastructure.Persistence;
 
-public sealed class ThemeSearchReader(NpgsqlDataSource dataSource) : IThemeSearchReader
+public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<ThemeSearchReader> logger) : IThemeSearchReader
 {
     private static readonly string SearchSql = Sql("dw.search_themes(@query, @limit)");
 
@@ -32,11 +33,19 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource) : IThemeSearc
     private async Task<IReadOnlyList<ThemeSummary>> QueryAsync(
         string sql, object parameters, CancellationToken cancellationToken)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        var rows = await connection.QueryAsync<ThemeSearchRow>(
-            new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
+        try
+        {
+            await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+            var rows = await connection.QueryAsync<ThemeSearchRow>(
+                new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
 
-        return rows.Select(Map).ToArray();
+            return rows.Select(Map).ToArray();
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+        {
+            logger.LogWarning(exception, "As views do DW não foram populadas: a carga ainda não foi aplicada neste banco.");
+            return [];
+        }
     }
 
     private static ThemeSummary Map(ThemeSearchRow row)
