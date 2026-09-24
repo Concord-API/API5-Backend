@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddSingleton<ILastExtractionReader, LastExtractionReader>();
         services.AddSingleton<IThemeSearchReader, ThemeSearchReader>();
         services.AddSingleton<IThemeDetailReader, ThemeDetailReader>();
+        services.AddSingleton<IProvenanceReader, ProvenanceReader>();
         services.AddSingleton<IDatabaseMigrator>(provider =>
             new DatabaseMigrator(connectionString, provider.GetRequiredService<ILogger<DatabaseMigrator>>()));
         return services;
