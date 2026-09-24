@@ -19,6 +19,8 @@ public sealed record ThemeDetail(
     public IReadOnlyList<UnavailableBlock> Unavailable { get; init; } = [];
 
     public Provenance Provenance { get; init; } = Provenance.None;
+
+    public Scope? Scope { get; init; }
 }
 
 public sealed record ThemeNarrative(
