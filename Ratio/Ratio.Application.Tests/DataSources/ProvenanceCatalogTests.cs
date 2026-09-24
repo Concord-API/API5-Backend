@@ -60,6 +60,32 @@ public class ProvenanceCatalogTests
         Assert.Equal("1.0", provenance.MethodologyVersion);
     }
 
+    [Theory]
+    [InlineData("cases", "datajud", false)]
+    [InlineData("cases", null, true)]
+    [InlineData("cases", " ", true)]
+    [InlineData(null, "datajud", true)]
+    public void Drops_a_source_without_a_name_a_block_or_an_extraction_date(string? block, string? code, bool dated)
+    {
+        var incomplete = new LoadedSource(block, code, dated ? LoadedAt : null, 12418);
+
+        var provenance = ProvenanceCatalog.Describe(
+            new LoadedProvenance([incomplete, new LoadedSource("doctrine", "doaj", LoadedAt, 40)], "1.0"));
+
+        var source = Assert.Single(provenance.Sources);
+        Assert.Equal("doctrine", source.Block);
+    }
+
+    [Fact]
+    public void Tells_whether_a_block_has_provenance()
+    {
+        var provenance = ProvenanceCatalog.Describe(
+            new LoadedProvenance([new LoadedSource("cases", "datajud", LoadedAt, 12418)], "1.0"));
+
+        Assert.True(provenance.Covers("cases"));
+        Assert.False(provenance.Covers("doctrine"));
+    }
+
     [Fact]
     public void Describes_nothing_when_nothing_was_loaded()
     {
