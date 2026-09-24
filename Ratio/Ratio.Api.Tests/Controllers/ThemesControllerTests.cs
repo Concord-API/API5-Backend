@@ -83,10 +83,10 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_no_top_themes_as_an_empty_list()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(7, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var response = await _client.GetAsync("/api/themes");
+        var response = await _client.GetAsync("/api/themes?limit=7");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
