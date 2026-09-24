@@ -16,6 +16,9 @@ public static class UnavailableBlocks
             "O DataJud não publica o relator.")
     ];
 
+    public static IReadOnlyList<UnavailableBlock> ForTheme(long judgedCount, bool hasSummary) =>
+        hasSummary ? Sourceless : [.. Sourceless, Summary(judgedCount)];
+
     public static UnavailableBlock Summary(long judgedCount) =>
         judgedCount == 0
             ? new("summary", UnavailableReason.NotApplicable,

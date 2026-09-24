@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Unavailable;
 
 namespace Ratio.Api.Controllers;
 
@@ -17,7 +18,10 @@ public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetail
             return Problem(detail: "Tema não encontrado.", statusCode: StatusCodes.Status404NotFound);
         }
 
-        return Ok(theme);
+        return Ok(theme with
+        {
+            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, theme.Summary is not null)
+        });
     }
 
     [HttpGet]
