@@ -13,6 +13,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public Mock<IThemeSearchReader> ThemeSearchReader { get; } = new();
 
+    public Mock<IThemeDetailReader> ThemeDetailReader { get; } = new();
+
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
     public ApiFactory() =>
@@ -26,6 +28,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         {
             services.AddSingleton(LastExtractionReader.Object);
             services.AddSingleton(ThemeSearchReader.Object);
+            services.AddSingleton(ThemeDetailReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });
