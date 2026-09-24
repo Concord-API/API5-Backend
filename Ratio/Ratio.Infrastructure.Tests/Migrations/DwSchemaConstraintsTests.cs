@@ -20,6 +20,13 @@ public class DwSchemaConstraintsTests(PostgresFixture postgres) : IClassFixture<
         "SELECT c.case_sk, c.court_sk, m.movement_sk, now(), 'https://example.org', now(), 'datajud:1:219' " +
         "FROM dw.dim_case c CROSS JOIN dw.dim_movement m;";
 
+    private const string Theme =
+        "INSERT INTO dw.dim_theme (theme_name, theme_key) VALUES ('Inscrição indevida', 42); ";
+
+    private const string Narrative =
+        "INSERT INTO dw.theme_narrative (theme_sk, lead, body, text_origin, methodology_version, generated_at) " +
+        "SELECT theme_sk, '[]'::jsonb, '[]'::jsonb, 'template', '1.0', DATE '2026-09-23' FROM dw.dim_theme WHERE theme_key = 42";
+
     private NpgsqlDataSource _dataSource = null!;
 
     public async Task InitializeAsync()
@@ -120,4 +127,20 @@ public class DwSchemaConstraintsTests(PostgresFixture postgres) : IClassFixture<
         AssertRejectedAsync(
             "INSERT INTO dw.dim_theme (theme_name, theme_key, subject_area) VALUES ('Tema', 1, 'PENAL')",
             PostgresErrorCodes.CheckViolation);
+
+    [Fact]
+    public Task Rejects_a_theme_narrative_with_an_unknown_text_origin() =>
+        AssertRejectedAsync(
+            Theme +
+            "INSERT INTO dw.theme_narrative (theme_sk, lead, body, text_origin, methodology_version, generated_at) " +
+            "SELECT theme_sk, '[]'::jsonb, '[]'::jsonb, 'generated', '1.0', DATE '2026-09-23' FROM dw.dim_theme WHERE theme_key = 42",
+            PostgresErrorCodes.CheckViolation);
+
+    [Fact]
+    public async Task Rejects_two_narratives_for_the_same_theme()
+    {
+        await ExecuteAsync(Theme + Narrative);
+
+        await AssertRejectedAsync(Narrative, PostgresErrorCodes.UniqueViolation);
+    }
 }

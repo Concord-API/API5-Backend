@@ -26,7 +26,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "dim_theme",
         "fact_case_event",
         "search_synonym",
-        "strength_config"
+        "strength_config",
+        "theme_narrative"
     ];
 
     private static readonly string[] MaterializedViews = ["case_current_result", "theme_outcome_distribution", "theme_strength", "theme_summary"];
@@ -43,6 +44,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V007__top_themes.sql",
         "V008__search_only_judged_themes.sql",
         "V009__break_strength_ties_by_volume.sql",
+        "V010__theme_narrative.sql",
         "V011__theme_outcome_distribution.sql"
     ];
 
