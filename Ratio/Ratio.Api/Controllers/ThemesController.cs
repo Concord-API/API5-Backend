@@ -55,16 +55,17 @@ public class ThemesController(
         }
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
+        var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
         if (string.IsNullOrWhiteSpace(q))
         {
             var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, cancellationToken);
 
-            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance });
+            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance, scope });
         }
 
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
 
-        return Ok(new { query = q, total = themes.Count, themes, provenance });
+        return Ok(new { query = q, total = themes.Count, themes, provenance, scope });
     }
 }
