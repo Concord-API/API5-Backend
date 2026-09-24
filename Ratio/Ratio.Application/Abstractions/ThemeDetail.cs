@@ -14,7 +14,10 @@ public sealed record ThemeDetail(
     int? PeriodStartYear,
     int? PeriodEndYear,
     DateOnly? LastDecisionDate,
-    ThemeNarrative? Summary);
+    ThemeNarrative? Summary)
+{
+    public IReadOnlyList<UnavailableBlock> Unavailable { get; init; } = [];
+}
 
 public sealed record ThemeNarrative(
     IReadOnlyList<JsonElement> Lead,

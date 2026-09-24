@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -50,7 +52,8 @@ builder.Services.AddControllers(options =>
     messages.SetNonPropertyUnknownValueIsInvalidAccessor(() => "O valor informado não é válido.");
     messages.SetValueMustBeANumberAccessor(field => $"O campo '{field}' precisa ser um número.");
     messages.SetNonPropertyValueMustBeANumberAccessor(() => "O valor precisa ser um número.");
-});
+}).AddJsonOptions(options =>
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
     options.InvalidModelStateResponseFactory = context =>

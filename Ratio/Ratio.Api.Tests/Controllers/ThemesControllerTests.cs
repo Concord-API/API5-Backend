@@ -93,6 +93,47 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(JsonValueKind.Null, body.GetProperty("summary").ValueKind);
     }
 
+    private async Task<JsonElement[]> UnavailableOfAsync(ThemeDetail detail)
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(detail.ThemeKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(detail);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>($"/api/themes/{detail.ThemeKey}");
+        return body.GetProperty("unavailable").EnumerateArray().ToArray();
+    }
+
+    [Fact]
+    public async Task Returns_the_sourceless_blocks_as_unavailable()
+    {
+        var unavailable = await UnavailableOfAsync(WrongfulListingDetail with { ThemeKey = 414 });
+
+        Assert.Equal(
+            ["caseLawCitation", "citedDecisions", "amountAwarded", "reporterJudge"],
+            unavailable.Select(item => item.GetProperty("block").GetString()));
+        Assert.All(unavailable, item => Assert.Equal("sourceUnavailable", item.GetProperty("reason").GetString()));
+        Assert.All(unavailable, item => Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("message").GetString())));
+    }
+
+    [Fact]
+    public async Task Explains_a_summary_not_loaded_yet_for_a_judged_theme()
+    {
+        var unavailable = await UnavailableOfAsync(WrongfulListingDetail with { ThemeKey = 415, Summary = null });
+
+        var summary = Assert.Single(unavailable, item => item.GetProperty("block").GetString() == "summary");
+        Assert.Equal("notLoaded", summary.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task Explains_that_a_summary_does_not_apply_to_a_theme_without_judged_cases()
+    {
+        var unavailable = await UnavailableOfAsync(
+            WrongfulListingDetail with { ThemeKey = 416, JudgedCount = 0, Summary = null });
+
+        var summary = Assert.Single(unavailable, item => item.GetProperty("block").GetString() == "summary");
+        Assert.Equal("notApplicable", summary.GetProperty("reason").GetString());
+    }
+
     [Theory]
     [InlineData(999999)]
     [InlineData(0)]
@@ -179,6 +220,21 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         var response = await _client.GetAsync("/api/themes?q=satelite");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
+        Assert.Equal(0, body.GetProperty("total").GetInt32());
+        Assert.Empty(body.GetProperty("themes").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Returns_no_top_themes_as_an_empty_list()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await _client.GetAsync("/api/themes?limit=7");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(0, body.GetProperty("total").GetInt32());
         Assert.Empty(body.GetProperty("themes").EnumerateArray());
     }
