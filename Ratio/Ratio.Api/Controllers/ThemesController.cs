@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
+using Ratio.Application.DataSources;
 using Ratio.Application.Unavailable;
 
 namespace Ratio.Api.Controllers;
 
 [ApiController]
 [Route("api/themes")]
-public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetailReader themeDetailReader) : ControllerBase
+public class ThemesController(
+    IThemeSearchReader themeSearchReader,
+    IThemeDetailReader themeDetailReader,
+    IProvenanceReader provenanceReader) : ControllerBase
 {
     [HttpGet("{key:long}")]
     public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
@@ -18,9 +22,14 @@ public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetail
             return Problem(detail: "Tema não encontrado.", statusCode: StatusCodes.Status404NotFound);
         }
 
+        var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
+        var summary = provenance.Covers("cases") ? theme.Summary : null;
+
         return Ok(theme with
         {
-            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, theme.Summary is not null)
+            Summary = summary,
+            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null),
+            Provenance = provenance
         });
     }
 
@@ -41,15 +50,17 @@ public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetail
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
+        var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
+
         if (string.IsNullOrWhiteSpace(q))
         {
             var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, cancellationToken);
 
-            return Ok(new { query = "", total = topThemes.Count, themes = topThemes });
+            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance });
         }
 
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
 
-        return Ok(new { query = q, total = themes.Count, themes });
+        return Ok(new { query = q, total = themes.Count, themes, provenance });
     }
 }
