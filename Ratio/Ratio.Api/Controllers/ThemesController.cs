@@ -1,12 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Unavailable;
 
 namespace Ratio.Api.Controllers;
 
 [ApiController]
 [Route("api/themes")]
-public class ThemesController(IThemeSearchReader themeSearchReader) : ControllerBase
+public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetailReader themeDetailReader) : ControllerBase
 {
+    [HttpGet("{key:long}")]
+    public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
+    {
+        var theme = await themeDetailReader.GetThemeAsync(key, cancellationToken);
+
+        if (theme is null)
+        {
+            return Problem(detail: "Tema não encontrado.", statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return Ok(theme with
+        {
+            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, theme.Summary is not null)
+        });
+    }
+
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? q, [FromQuery] int? limit, CancellationToken cancellationToken)
     {

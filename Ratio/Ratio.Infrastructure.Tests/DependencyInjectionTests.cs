@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Ratio.Application.Abstractions;
 using Ratio.Infrastructure.Migrations;
+using Ratio.Infrastructure.Persistence;
 
 namespace Ratio.Infrastructure.Tests;
 
@@ -33,5 +34,16 @@ public class DependencyInjectionTests
         using var provider = services.BuildServiceProvider();
 
         Assert.IsType<DatabaseMigrator>(provider.GetRequiredService<IDatabaseMigrator>());
+    }
+
+    [Fact]
+    public void Registers_the_theme_detail_reader()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<ThemeDetailReader>(provider.GetRequiredService<IThemeDetailReader>());
     }
 }
