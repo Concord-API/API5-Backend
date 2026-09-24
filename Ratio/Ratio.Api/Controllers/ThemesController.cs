@@ -5,8 +5,16 @@ namespace Ratio.Api.Controllers;
 
 [ApiController]
 [Route("api/themes")]
-public class ThemesController(IThemeSearchReader themeSearchReader) : ControllerBase
+public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetailReader themeDetailReader) : ControllerBase
 {
+    [HttpGet("{key:long}")]
+    public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
+    {
+        var theme = await themeDetailReader.GetThemeAsync(key, cancellationToken);
+
+        return Ok(theme);
+    }
+
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? q, [FromQuery] int? limit, CancellationToken cancellationToken)
     {
