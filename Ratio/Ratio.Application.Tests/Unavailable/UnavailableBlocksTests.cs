@@ -40,3 +40,26 @@ public class UnavailableBlocksTests
         Assert.Equal(messages.Length, messages.Distinct().Count());
     }
 }
+
+public class SummaryUnavailableTests
+{
+    [Fact]
+    public void Says_the_summary_does_not_apply_to_a_theme_without_judged_cases()
+    {
+        var item = UnavailableBlocks.Summary(judgedCount: 0);
+
+        Assert.Equal("summary", item.Block);
+        Assert.Equal(UnavailableReason.NotApplicable, item.Reason);
+        Assert.Equal("Este tema não tem decisões julgadas, então não há entendimento para descrever.", item.Message);
+    }
+
+    [Fact]
+    public void Says_the_summary_was_not_loaded_yet_for_a_theme_with_judged_cases()
+    {
+        var item = UnavailableBlocks.Summary(judgedCount: 144);
+
+        Assert.Equal("summary", item.Block);
+        Assert.Equal(UnavailableReason.NotLoaded, item.Reason);
+        Assert.Equal("O texto deste tema ainda não foi gerado; ele sai na próxima carga.", item.Message);
+    }
+}
