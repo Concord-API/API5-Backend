@@ -12,6 +12,11 @@ public class ThemesController(IThemeSearchReader themeSearchReader, IThemeDetail
     {
         var theme = await themeDetailReader.GetThemeAsync(key, cancellationToken);
 
+        if (theme is null)
+        {
+            return Problem(detail: "Tema não encontrado.", statusCode: StatusCodes.Status404NotFound);
+        }
+
         return Ok(theme);
     }
 
