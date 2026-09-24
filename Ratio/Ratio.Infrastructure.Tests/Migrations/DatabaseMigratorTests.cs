@@ -29,7 +29,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "strength_config"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "theme_strength", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "theme_outcome_distribution", "theme_strength", "theme_summary"];
 
     private static readonly string[] Scripts =
     [
@@ -42,7 +42,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V006__search_synonyms.sql",
         "V007__top_themes.sql",
         "V008__search_only_judged_themes.sql",
-        "V009__break_strength_ties_by_volume.sql"
+        "V009__break_strength_ties_by_volume.sql",
+        "V011__theme_outcome_distribution.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
