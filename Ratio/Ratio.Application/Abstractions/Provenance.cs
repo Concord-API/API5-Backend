@@ -3,6 +3,8 @@ namespace Ratio.Application.Abstractions;
 public sealed record Provenance(IReadOnlyList<ProvenanceSource> Sources, string? MethodologyVersion)
 {
     public static Provenance None { get; } = new([], null);
+
+    public bool Covers(string block) => Sources.Any(source => source.Block == block);
 }
 
 public sealed record ProvenanceSource(

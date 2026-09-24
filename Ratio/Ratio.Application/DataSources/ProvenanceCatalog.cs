@@ -12,7 +12,12 @@ public static class ProvenanceCatalog
     };
 
     public static Provenance Describe(LoadedProvenance loaded) =>
-        new(loaded.Sources.Select(Describe).ToArray(), loaded.MethodologyVersion);
+        new(loaded.Sources.Where(IsComplete).Select(Describe).ToArray(), loaded.MethodologyVersion);
+
+    private static bool IsComplete(LoadedSource loaded) =>
+        !string.IsNullOrWhiteSpace(loaded.Block)
+        && !string.IsNullOrWhiteSpace(loaded.Source)
+        && loaded.ExtractedAt is not null;
 
     private static ProvenanceSource Describe(LoadedSource loaded)
     {
