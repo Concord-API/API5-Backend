@@ -93,6 +93,37 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(JsonValueKind.Null, body.GetProperty("summary").ValueKind);
     }
 
+    [Theory]
+    [InlineData(999999)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Returns_not_found_for_an_unknown_theme_key(long key)
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThemeDetail?)null);
+
+        var response = await _client.GetAsync($"/api/themes/{key}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Recurso não encontrado", body.GetProperty("title").GetString());
+        Assert.Equal("Tema não encontrado.", body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_not_found_without_detail_for_a_non_numeric_key()
+    {
+        var response = await _client.GetAsync("/api/themes/abc");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("Recurso não encontrado", body.GetProperty("title").GetString());
+        Assert.False(body.TryGetProperty("detail", out _));
+    }
+
     [Fact]
     public async Task Returns_the_contract_shape_with_theme_key_never_theme_sk()
     {
