@@ -80,6 +80,21 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Returns_no_top_themes_as_an_empty_list()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await _client.GetAsync("/api/themes");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, body.GetProperty("total").GetInt32());
+        Assert.Empty(body.GetProperty("themes").EnumerateArray());
+    }
+
+    [Fact]
     public async Task Defaults_the_limit_to_20_when_absent()
     {
         factory.ThemeSearchReader
