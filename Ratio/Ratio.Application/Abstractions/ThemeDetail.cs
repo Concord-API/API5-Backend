@@ -21,6 +21,8 @@ public sealed record ThemeDetail(
     public string PartialTreatment => "Na nota de força, a procedência em parte conta como acolhimento.";
 
     public IReadOnlyList<UnavailableBlock> Unavailable { get; init; } = [];
+
+    public Provenance Provenance { get; init; } = Provenance.None;
 }
 
 public sealed record ThemeNarrative(

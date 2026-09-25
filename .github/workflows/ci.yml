@@ -58,3 +58,62 @@ jobs:
           path: artifacts/api/
           if-no-files-found: error
           retention-days: 30
+
+  quality:
+    name: Backend quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
+      SONAR_WAIT_GATE: ${{ github.event_name == 'pull_request' }}
+      SONAR_ORGANIZATION: concord-api
+      SONAR_PROJECT_KEY: Concord-API_API5-Backend
+    defaults:
+      run:
+        working-directory: Ratio
+    steps:
+      - name: Skip when SonarQube Cloud is not configured
+        if: ${{ env.SONAR_TOKEN == '' }}
+        working-directory: .
+        run: echo "::warning::SONAR_TOKEN is not available, the quality analysis was skipped"
+      - name: Skip branches that the SonarQube Cloud plan does not analyze
+        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_ENABLED != 'true' }}
+        working-directory: .
+        run: echo "Only pull requests and main are analyzed; this push is covered by its pull request analysis"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: Ratio/**/packages.lock.json
+      - name: Restore locked tools and dependencies
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        run: |
+          dotnet tool restore
+          dotnet restore Ratio.slnx --locked-mode
+      - name: Start the SonarQube Cloud analysis
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        run: >
+          dotnet sonarscanner begin
+          /k:"$SONAR_PROJECT_KEY"
+          /o:"$SONAR_ORGANIZATION"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.cs.opencover.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/coverage.opencover.xml"
+          /d:sonar.cs.vstest.reportsPaths="$GITHUB_WORKSPACE/QualityResults/*.trx"
+          /d:sonar.qualitygate.wait="$SONAR_WAIT_GATE"
+          /d:sonar.qualitygate.timeout=300
+      - name: Build for analysis
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        run: dotnet build Ratio.slnx --configuration Release --no-restore
+      - name: Run tests with coverage
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --collect:"XPlat Code Coverage" --logger trx --results-directory "$GITHUB_WORKSPACE/QualityResults"
+      - name: Send the analysis and wait for the quality gate
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
