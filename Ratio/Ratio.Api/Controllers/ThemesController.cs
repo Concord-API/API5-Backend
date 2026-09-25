@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Coverage;
 using Ratio.Application.DataSources;
 using Ratio.Application.Unavailable;
 
@@ -10,7 +11,8 @@ namespace Ratio.Api.Controllers;
 public class ThemesController(
     IThemeSearchReader themeSearchReader,
     IThemeDetailReader themeDetailReader,
-    IProvenanceReader provenanceReader) : ControllerBase
+    IProvenanceReader provenanceReader,
+    IScopeReader scopeReader) : ControllerBase
 {
     [HttpGet("{key:long}")]
     public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
@@ -24,12 +26,14 @@ public class ThemesController(
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
         var summary = provenance.Covers("cases") ? theme.Summary : null;
+        var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
         return Ok(theme with
         {
             Summary = summary,
             Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null),
-            Provenance = provenance
+            Provenance = provenance,
+            Scope = scope
         });
     }
 
@@ -51,16 +55,17 @@ public class ThemesController(
         }
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
+        var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
         if (string.IsNullOrWhiteSpace(q))
         {
             var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, cancellationToken);
 
-            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance });
+            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance, scope });
         }
 
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
 
-        return Ok(new { query = q, total = themes.Count, themes, provenance });
+        return Ok(new { query = q, total = themes.Count, themes, provenance, scope });
     }
 }

@@ -54,6 +54,52 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal("1.0", provenance.GetProperty("methodologyVersion").GetString());
     }
 
+    private static void AssertDeclaresTheScope(JsonElement scope)
+    {
+        Assert.Equal("TJMG, TJRJ e TJSP", scope.GetProperty("statement").GetString());
+        Assert.Equal("cível", scope.GetProperty("subject").GetString());
+        var court = scope.GetProperty("courts")[0];
+        Assert.Equal("TJMG", court.GetProperty("code").GetString());
+        Assert.Equal("Tribunal de Justiça de Minas Gerais", court.GetProperty("name").GetString());
+        Assert.Equal("MG", court.GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_the_scope_with_the_theme()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(430, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 430 });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/430");
+
+        AssertDeclaresTheScope(body.GetProperty("scope"));
+    }
+
+    [Fact]
+    public async Task Returns_the_scope_with_the_search()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("negativacao", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=negativacao");
+
+        AssertDeclaresTheScope(body.GetProperty("scope"));
+    }
+
+    [Fact]
+    public async Task Returns_the_scope_with_the_top_themes()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(11, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=11");
+
+        AssertDeclaresTheScope(body.GetProperty("scope"));
+    }
+
     [Fact]
     public async Task Returns_the_provenance_of_the_theme()
     {
