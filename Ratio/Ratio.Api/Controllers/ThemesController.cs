@@ -10,7 +10,8 @@ namespace Ratio.Api.Controllers;
 public class ThemesController(
     IThemeSearchReader themeSearchReader,
     IThemeDetailReader themeDetailReader,
-    IProvenanceReader provenanceReader) : ControllerBase
+    IProvenanceReader provenanceReader,
+    IDoctrineReader doctrineReader) : ControllerBase
 {
     [HttpGet("{key:long}")]
     public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
@@ -24,12 +25,19 @@ public class ThemesController(
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
         var summary = provenance.Covers("cases") ? theme.Summary : null;
+        var relatedDoctrine = provenance.Covers("doctrine")
+            ? RelatedDoctrine.Empty with
+            {
+                Entries = await doctrineReader.GetRelatedAsync(key, RelatedDoctrine.MaxEntries, cancellationToken)
+            }
+            : RelatedDoctrine.Empty;
 
         return Ok(theme with
         {
             Summary = summary,
             Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null),
-            Provenance = provenance
+            Provenance = provenance,
+            RelatedDoctrine = relatedDoctrine
         });
     }
 
