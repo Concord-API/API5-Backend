@@ -16,6 +16,10 @@ public sealed record ThemeDetail(
     DateOnly? LastDecisionDate,
     ThemeNarrative? Summary)
 {
+    public IReadOnlyList<OutcomeBreakdown> OutcomeBreakdown { get; init; } = [];
+
+    public string PartialTreatment => "Na nota de força, a procedência em parte conta como acolhimento.";
+
     public IReadOnlyList<UnavailableBlock> Unavailable { get; init; } = [];
 
     public Provenance Provenance { get; init; } = Provenance.None;

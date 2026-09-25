@@ -49,6 +49,7 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.case_current_result");
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_summary");
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_strength");
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_outcome_distribution");
     }
 
     public Task DisposeAsync() => _dataSource.DisposeAsync().AsTask();

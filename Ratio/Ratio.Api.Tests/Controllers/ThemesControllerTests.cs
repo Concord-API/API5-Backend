@@ -172,6 +172,73 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(JsonValueKind.Null, body.GetProperty("summary").ValueKind);
     }
 
+    [Fact]
+    public async Task Returns_the_outcome_breakdown_by_family_with_the_partial_treatment()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(420, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with
+            {
+                ThemeKey = 420,
+                OutcomeBreakdown =
+                [
+                    new OutcomeBreakdown("acolhimento da pretensão do autor", 144,
+                    [
+                        new OutcomeCategory("Procedente", 100, 0.6944m),
+                        new OutcomeCategory("Parcialmente procedente", 42, 0.2917m),
+                        new OutcomeCategory("Improcedente", 2, 0.0139m)
+                    ]),
+                    new OutcomeBreakdown("acolhimento da pretensão de quem recorreu", 1,
+                    [
+                        new OutcomeCategory("Procedente", 1, null),
+                        new OutcomeCategory("Parcialmente procedente", 0, null),
+                        new OutcomeCategory("Improcedente", 0, null)
+                    ])
+                ]
+            });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/420");
+
+        var breakdown = body.GetProperty("outcomeBreakdown");
+        Assert.Equal(2, breakdown.GetArrayLength());
+
+        var merit = breakdown[0];
+        Assert.Equal("acolhimento da pretensão do autor", merit.GetProperty("polarityLabel").GetString());
+        Assert.Equal(144, merit.GetProperty("judged").GetInt64());
+        Assert.Equal(
+            ["Procedente", "Parcialmente procedente", "Improcedente"],
+            merit.GetProperty("categories").EnumerateArray().Select(category => category.GetProperty("outcome").GetString()));
+        Assert.Equal(
+            [100L, 42L, 2L],
+            merit.GetProperty("categories").EnumerateArray().Select(category => category.GetProperty("count").GetInt64()));
+        Assert.Equal(
+            [0.6944m, 0.2917m, 0.0139m],
+            merit.GetProperty("categories").EnumerateArray().Select(category => category.GetProperty("ratio").GetDecimal()));
+
+        var appeal = breakdown[1];
+        Assert.Equal("acolhimento da pretensão de quem recorreu", appeal.GetProperty("polarityLabel").GetString());
+        Assert.Equal(1, appeal.GetProperty("judged").GetInt64());
+        Assert.All(
+            appeal.GetProperty("categories").EnumerateArray(),
+            category => Assert.Equal(JsonValueKind.Null, category.GetProperty("ratio").ValueKind));
+
+        Assert.Equal(
+            "Na nota de força, a procedência em parte conta como acolhimento.",
+            body.GetProperty("partialTreatment").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_an_empty_outcome_breakdown_for_a_theme_without_judged_cases()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(421, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 421, JudgedCount = 0, Summary = null });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/421");
+
+        Assert.Equal(0, body.GetProperty("outcomeBreakdown").GetArrayLength());
+    }
+
     private async Task<JsonElement[]> UnavailableOfAsync(ThemeDetail detail)
     {
         factory.ThemeDetailReader
