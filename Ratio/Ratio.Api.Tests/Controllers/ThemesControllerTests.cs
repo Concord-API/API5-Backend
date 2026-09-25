@@ -89,6 +89,75 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal("notLoaded", summary.GetProperty("reason").GetString());
     }
 
+    private static readonly LoadedProvenance LoadedCasesAndDoctrine = new(
+        [
+            .. LoadedCases.Sources,
+            new LoadedSource("doctrine", "oai_emerj", new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero), 1)
+        ],
+        "1.0");
+
+    private static readonly DoctrineEntry HistoricalDamages = new(
+        "Dano moral: aspectos históricos e de quantificação",
+        "Maria Silva; João Souza",
+        "Revista da EMERJ",
+        2021,
+        "10.1234/emerj.2021.001",
+        "https://doi.org/10.1234/emerj.2021.001",
+        "oai_emerj",
+        0.854,
+        "embedding_cosine+lexical",
+        "paraphrase-multilingual-MiniLM-L12-v2");
+
+    [Fact]
+    public async Task Returns_the_related_doctrine_with_its_declared_threshold()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(430, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 430 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(430, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCasesAndDoctrine);
+        factory.DoctrineReader
+            .Setup(reader => reader.GetRelatedAsync(430, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([HistoricalDamages]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/430");
+
+        var doctrine = body.GetProperty("relatedDoctrine");
+        Assert.Equal(0.55, doctrine.GetProperty("threshold").GetDouble());
+        var entry = Assert.Single(doctrine.GetProperty("entries").EnumerateArray());
+        Assert.Equal("Dano moral: aspectos históricos e de quantificação", entry.GetProperty("title").GetString());
+        Assert.Equal("Maria Silva; João Souza", entry.GetProperty("authors").GetString());
+        Assert.Equal("Revista da EMERJ", entry.GetProperty("journal").GetString());
+        Assert.Equal(2021, entry.GetProperty("publicationYear").GetInt32());
+        Assert.Equal("10.1234/emerj.2021.001", entry.GetProperty("doi").GetString());
+        Assert.Equal("https://doi.org/10.1234/emerj.2021.001", entry.GetProperty("link").GetString());
+        Assert.Equal("oai_emerj", entry.GetProperty("source").GetString());
+        Assert.Equal(0.854, entry.GetProperty("similarity").GetDouble());
+        Assert.Equal("embedding_cosine+lexical", entry.GetProperty("linkMethod").GetString());
+        Assert.Equal("paraphrase-multilingual-MiniLM-L12-v2", entry.GetProperty("embeddingModel").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_no_related_doctrine_when_the_doctrine_has_no_provenance()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(431, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 431 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(431, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCases);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/431");
+
+        var doctrine = body.GetProperty("relatedDoctrine");
+        Assert.Equal(0.55, doctrine.GetProperty("threshold").GetDouble());
+        Assert.Empty(doctrine.GetProperty("entries").EnumerateArray());
+        factory.DoctrineReader.Verify(
+            reader => reader.GetRelatedAsync(431, It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     [Fact]
     public async Task Returns_the_global_provenance_with_the_search()
     {

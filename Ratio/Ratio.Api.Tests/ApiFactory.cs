@@ -17,6 +17,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public Mock<IProvenanceReader> ProvenanceReader { get; } = new();
 
+    public Mock<IDoctrineReader> DoctrineReader { get; } = new();
+
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
     public static LoadedProvenance LoadedCases { get; } = new(
@@ -28,6 +30,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         DatabaseMigrator.Setup(migrator => migrator.MigrateAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
         ProvenanceReader.Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>())).ReturnsAsync(LoadedProvenance.Empty);
         ProvenanceReader.Setup(reader => reader.GetThemeAsync(It.IsAny<long>(), It.IsAny<CancellationToken>())).ReturnsAsync(LoadedCases);
+        DoctrineReader.Setup(reader => reader.GetRelatedAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -40,6 +43,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(ThemeSearchReader.Object);
             services.AddSingleton(ThemeDetailReader.Object);
             services.AddSingleton(ProvenanceReader.Object);
+            services.AddSingleton(DoctrineReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });
