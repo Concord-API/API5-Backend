@@ -159,6 +159,31 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Explains_when_the_theme_has_no_related_doctrine_above_the_threshold()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(432, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 432 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(432, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCasesAndDoctrine);
+        factory.DoctrineReader
+            .Setup(reader => reader.GetRelatedAsync(432, 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/432");
+
+        Assert.Empty(body.GetProperty("relatedDoctrine").GetProperty("entries").EnumerateArray());
+        var unavailable = Assert.Single(
+            body.GetProperty("unavailable").EnumerateArray(),
+            item => item.GetProperty("block").GetString() == "relatedDoctrine");
+        Assert.Equal("notApplicable", unavailable.GetProperty("reason").GetString());
+        Assert.Equal(
+            "Não há doutrina relacionada a este tema acima do limiar de similaridade declarado.",
+            unavailable.GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task Returns_the_global_provenance_with_the_search()
     {
         factory.ThemeSearchReader
