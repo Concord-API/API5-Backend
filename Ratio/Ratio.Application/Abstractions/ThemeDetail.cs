@@ -24,6 +24,8 @@ public sealed record ThemeDetail(
 
     public Provenance Provenance { get; init; } = Provenance.None;
 
+    public RelatedDoctrine RelatedDoctrine { get; init; } = RelatedDoctrine.Empty;
+
     public Scope? Scope { get; init; }
 }
 

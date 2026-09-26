@@ -12,6 +12,7 @@ public class ThemesController(
     IThemeSearchReader themeSearchReader,
     IThemeDetailReader themeDetailReader,
     IProvenanceReader provenanceReader,
+    IDoctrineReader doctrineReader,
     IScopeReader scopeReader) : ControllerBase
 {
     [HttpGet("{key:long}")]
@@ -26,13 +27,28 @@ public class ThemesController(
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
         var summary = provenance.Covers("cases") ? theme.Summary : null;
+        var hasDoctrineProvenance = provenance.Covers("doctrine");
+        var relatedDoctrine = hasDoctrineProvenance
+            ? RelatedDoctrine.Empty with
+            {
+                Entries = await doctrineReader.GetRelatedAsync(key, RelatedDoctrine.MaxEntries, cancellationToken)
+            }
+            : RelatedDoctrine.Empty;
+        var unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null);
+
+        if (hasDoctrineProvenance && relatedDoctrine.Entries.Count == 0)
+        {
+            unavailable = [.. unavailable, UnavailableBlocks.RelatedDoctrine()];
+        }
+
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
         return Ok(theme with
         {
             Summary = summary,
-            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null),
+            Unavailable = unavailable,
             Provenance = provenance,
+            RelatedDoctrine = relatedDoctrine,
             Scope = scope
         });
     }
@@ -55,6 +71,7 @@ public class ThemesController(
         }
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
+
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
         if (string.IsNullOrWhiteSpace(q))

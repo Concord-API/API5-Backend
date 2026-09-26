@@ -63,3 +63,16 @@ public class SummaryUnavailableTests
         Assert.Equal("O texto deste tema ainda não foi gerado; ele sai na próxima carga.", item.Message);
     }
 }
+
+public class RelatedDoctrineUnavailableTests
+{
+    [Fact]
+    public void Says_related_doctrine_does_not_apply_without_links_above_the_threshold()
+    {
+        var item = UnavailableBlocks.RelatedDoctrine();
+
+        Assert.Equal("relatedDoctrine", item.Block);
+        Assert.Equal(UnavailableReason.NotApplicable, item.Reason);
+        Assert.Equal("Não há doutrina relacionada a este tema acima do limiar de similaridade declarado.", item.Message);
+    }
+}
