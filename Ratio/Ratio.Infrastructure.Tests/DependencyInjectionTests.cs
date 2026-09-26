@@ -68,4 +68,15 @@ public class DependencyInjectionTests
 
         Assert.IsType<DoctrineReader>(provider.GetRequiredService<IDoctrineReader>());
     }
+
+    [Fact]
+    public void Registers_the_scope_reader()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<ScopeReader>(provider.GetRequiredService<IScopeReader>());
+    }
 }

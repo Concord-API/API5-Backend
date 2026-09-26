@@ -23,6 +23,22 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         WHERE t.theme_key = @themeKey
         """;
 
+    private const string BreakdownSql = """
+        SELECT CASE d.polarity_reference
+                   WHEN 'pretensao_autor' THEN s.claim_polarity_label
+                   ELSE 'acolhimento da pretensão de quem recorreu'
+               END AS PolarityLabel,
+               d.judged_count AS Judged, d.upheld_count AS Upheld,
+               d.partially_upheld_count AS PartiallyUpheld, d.rejected_count AS Rejected,
+               cfg.min_judged_for_percentage AS MinJudgedForPercentage
+        FROM dw.theme_outcome_distribution d
+        JOIN dw.dim_theme t ON t.theme_sk = d.theme_sk
+        JOIN dw.theme_summary s ON s.theme_sk = d.theme_sk
+        LEFT JOIN dw.strength_config cfg ON cfg.id = 1
+        WHERE t.theme_key = @themeKey
+        ORDER BY d.polarity_reference
+        """;
+
     public async Task<ThemeDetail?> GetThemeAsync(long themeKey, CancellationToken cancellationToken)
     {
         try
@@ -31,7 +47,15 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             var row = await connection.QuerySingleOrDefaultAsync<ThemeDetailRow>(
                 new CommandDefinition(Sql, new { themeKey }, cancellationToken: cancellationToken));
 
-            return row is null ? null : Map(row);
+            if (row is null)
+            {
+                return null;
+            }
+
+            var breakdown = await connection.QueryAsync<BreakdownRow>(
+                new CommandDefinition(BreakdownSql, new { themeKey }, cancellationToken: cancellationToken));
+
+            return Map(row) with { OutcomeBreakdown = breakdown.Select(MapBreakdown).ToArray() };
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
         {
@@ -65,6 +89,23 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
                 row.MethodologyVersion!,
                 DateOnly.FromDateTime(row.GeneratedAt!.Value));
 
+    private static OutcomeBreakdown MapBreakdown(BreakdownRow row)
+    {
+        var meetsFloor = row.MinJudgedForPercentage is not null && row.Judged >= row.MinJudgedForPercentage;
+
+        OutcomeCategory Category(string outcome, long count) =>
+            new(outcome, count, meetsFloor ? Math.Round((decimal)count / row.Judged, 4) : null);
+
+        return new OutcomeBreakdown(
+            row.PolarityLabel,
+            row.Judged,
+            [
+                Category("Procedente", row.Upheld),
+                Category("Parcialmente procedente", row.PartiallyUpheld),
+                Category("Improcedente", row.Rejected)
+            ]);
+    }
+
     private static DateOnly? ToDateOnly(DateTime? value) =>
         value is null ? null : DateOnly.FromDateTime(value.Value);
 
@@ -85,4 +126,12 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         string? TextOrigin,
         string? MethodologyVersion,
         DateTime? GeneratedAt);
+
+    private sealed record BreakdownRow(
+        string PolarityLabel,
+        long Judged,
+        long Upheld,
+        long PartiallyUpheld,
+        long Rejected,
+        short? MinJudgedForPercentage);
 }
