@@ -25,17 +25,24 @@ public class ThemesController(
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
         var summary = provenance.Covers("cases") ? theme.Summary : null;
-        var relatedDoctrine = provenance.Covers("doctrine")
+        var hasDoctrineProvenance = provenance.Covers("doctrine");
+        var relatedDoctrine = hasDoctrineProvenance
             ? RelatedDoctrine.Empty with
             {
                 Entries = await doctrineReader.GetRelatedAsync(key, RelatedDoctrine.MaxEntries, cancellationToken)
             }
             : RelatedDoctrine.Empty;
+        var unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null);
+
+        if (hasDoctrineProvenance && relatedDoctrine.Entries.Count == 0)
+        {
+            unavailable = [.. unavailable, UnavailableBlocks.RelatedDoctrine()];
+        }
 
         return Ok(theme with
         {
             Summary = summary,
-            Unavailable = UnavailableBlocks.ForTheme(theme.JudgedCount, summary is not null),
+            Unavailable = unavailable,
             Provenance = provenance,
             RelatedDoctrine = relatedDoctrine
         });

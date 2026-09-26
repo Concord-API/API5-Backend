@@ -25,4 +25,8 @@ public static class UnavailableBlocks
                 "Este tema não tem decisões julgadas, então não há entendimento para descrever.")
             : new("summary", UnavailableReason.NotLoaded,
                 "O texto deste tema ainda não foi gerado; ele sai na próxima carga.");
+
+    public static UnavailableBlock RelatedDoctrine() =>
+        new("relatedDoctrine", UnavailableReason.NotApplicable,
+            "Não há doutrina relacionada a este tema acima do limiar de similaridade declarado.");
 }
