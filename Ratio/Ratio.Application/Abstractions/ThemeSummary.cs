@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Ratio.Application.Abstractions;
 
 public sealed record ThemeSummary(
@@ -10,6 +12,11 @@ public sealed record ThemeSummary(
     ThemeOutcome Outcome,
     int? PeriodStartYear,
     int? PeriodEndYear,
-    DateOnly? LastDecisionDate);
+    DateOnly? LastDecisionDate)
+{
+    public ThemeResultSummary? Summary { get; init; }
+}
 
 public sealed record ThemeOutcome(long Upheld, long Rejected, decimal? UpheldRatio, string? PolarityLabel);
+
+public sealed record ThemeResultSummary(IReadOnlyList<JsonElement> Lead);
