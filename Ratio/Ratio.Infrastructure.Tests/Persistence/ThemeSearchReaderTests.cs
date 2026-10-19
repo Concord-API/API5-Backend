@@ -23,7 +23,8 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
 
     private const string Dates =
         "INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day) VALUES " +
-        "(20240615, '2024-06-15', 2024, 2, 6, 'Junho', 15);";
+        "(20240615, '2024-06-15', 2024, 2, 6, 'Junho', 15), " +
+        "(20210310, '2021-03-10', 2021, 1, 3, 'Março', 10);";
 
     private readonly PostgresFixture _postgres;
     private NpgsqlDataSource _dataSource = null!;
@@ -78,11 +79,11 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
             new { themeKey, subjectCode });
     }
 
-    private async Task InsertJudgedCasesAsync(long themeKey, int upheldCount, int rejectedCount, int dateSk)
+    private async Task InsertJudgedCasesAsync(long themeKey, int upheldCount, int rejectedCount, int dateSk, string batch = "")
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
         var subjectCode = themeKey * 100;
-        var casePrefix = $"CASE-{themeKey}-";
+        var casePrefix = $"CASE-{themeKey}{batch}-";
         var casePrefixPattern = casePrefix + "%";
         await connection.ExecuteAsync(
             "INSERT INTO dw.dim_case (case_number, court_sk, case_class_sk, court_level, source, extracted_at) " +
@@ -156,6 +157,34 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(0.9861m, theme.Outcome.UpheldRatio);
         Assert.Equal("acolhimento da pretensão do autor", theme.Outcome.PolarityLabel);
         Assert.Equal(new DateOnly(2024, 6, 15), theme.LastDecisionDate);
+    }
+
+    [Fact]
+    public async Task Returns_the_period_from_the_first_to_the_last_decision()
+    {
+        await InsertThemeAsync(40, "Negativação após quitação");
+        await InsertJudgedCasesAsync(40, upheldCount: 3, rejectedCount: 0, dateSk: 20210310, batch: "a");
+        await InsertJudgedCasesAsync(40, upheldCount: 2, rejectedCount: 1, dateSk: 20240615, batch: "b");
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("negativacao apos quitacao", 20, CancellationToken.None));
+
+        Assert.Equal(2021, theme.PeriodStartYear);
+        Assert.Equal(2024, theme.PeriodEndYear);
+    }
+
+    [Fact]
+    public async Task Returns_the_period_with_the_top_themes()
+    {
+        await InsertThemeAsync(41, "Negativação após quitação");
+        await InsertJudgedCasesAsync(41, upheldCount: 3, rejectedCount: 0, dateSk: 20210310, batch: "a");
+        await InsertJudgedCasesAsync(41, upheldCount: 2, rejectedCount: 1, dateSk: 20240615, batch: "b");
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.TopThemesAsync(20, CancellationToken.None));
+
+        Assert.Equal(2021, theme.PeriodStartYear);
+        Assert.Equal(2024, theme.PeriodEndYear);
     }
 
     [Fact]
