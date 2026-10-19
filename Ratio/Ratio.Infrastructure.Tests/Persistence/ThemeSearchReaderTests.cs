@@ -107,6 +107,18 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
             new { dateSk, upheldCount, casePrefixPattern, upheldMovement, rejectedMovement });
     }
 
+    private async Task InsertNarrativeAsync(long themeKey)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.theme_narrative (theme_sk, lead, body, text_origin, methodology_version, generated_at) " +
+            "SELECT theme_sk, " +
+            "'[{\"text\":\"Em \"},{\"ratio\":0.75,\"n\":4,\"unit\":\"decisões\"},{\"text\":\" julgadas, houve acolhimento da pretensão do autor.\"}]'::jsonb, " +
+            "'[{\"text\":\"As decisões vêm de 1 tribunal, em 2024.\"}]'::jsonb, 'template', '1.0', DATE '2026-09-23' " +
+            "FROM dw.dim_theme WHERE theme_key = @themeKey",
+            new { themeKey });
+    }
+
     private async Task InsertUnjudgedCaseAsync(long themeKey)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
@@ -189,6 +201,51 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
 
         Assert.Equal(2021, theme.PeriodStartYear);
         Assert.Equal(2024, theme.PeriodEndYear);
+    }
+
+    [Fact]
+    public async Task Returns_the_narrative_lead_as_the_summary_of_a_search_result()
+    {
+        await InsertThemeAsync(43, "Cobrança de seguro prestamista");
+        await InsertJudgedCasesAsync(43, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
+        await InsertNarrativeAsync(43);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, CancellationToken.None));
+
+        Assert.NotNull(theme.Summary);
+        Assert.Equal(3, theme.Summary.Lead.Count);
+        Assert.Equal("Em ", theme.Summary.Lead[0].GetProperty("text").GetString());
+        Assert.Equal(0.75m, theme.Summary.Lead[1].GetProperty("ratio").GetDecimal());
+        Assert.Equal(4, theme.Summary.Lead[1].GetProperty("n").GetInt64());
+        Assert.Equal("decisões", theme.Summary.Lead[1].GetProperty("unit").GetString());
+        Assert.Equal(" julgadas, houve acolhimento da pretensão do autor.", theme.Summary.Lead[2].GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_the_narrative_lead_as_the_summary_of_a_top_theme()
+    {
+        await InsertThemeAsync(44, "Cobrança de seguro prestamista");
+        await InsertJudgedCasesAsync(44, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
+        await InsertNarrativeAsync(44);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.TopThemesAsync(20, CancellationToken.None));
+
+        Assert.NotNull(theme.Summary);
+        Assert.Equal("Em ", theme.Summary.Lead[0].GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_no_summary_for_a_theme_without_narrative()
+    {
+        await InsertThemeAsync(45, "Cobrança de seguro prestamista");
+        await InsertJudgedCasesAsync(45, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, CancellationToken.None));
+
+        Assert.Null(theme.Summary);
     }
 
     [Fact]

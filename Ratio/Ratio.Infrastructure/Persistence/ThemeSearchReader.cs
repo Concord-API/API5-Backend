@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -17,11 +18,12 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
                sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
-               ts.agreement_basis AS AgreementBasis
+               ts.agreement_basis AS AgreementBasis, n.lead::text AS Lead
         FROM {source} s
         JOIN dw.dim_theme t ON t.theme_key = s.theme_key
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
         LEFT JOIN dw.theme_summary sm ON sm.theme_sk = t.theme_sk
+        LEFT JOIN dw.theme_narrative n ON n.theme_sk = t.theme_sk
         LEFT JOIN dw.strength_config cfg ON cfg.id = 1
         ORDER BY s.position
         """;
@@ -65,7 +67,12 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         return new ThemeSummary(
             row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, row.Level,
             new ThemeOutcome(upheld, rejected, upheldRatio, row.PolarityLabel),
-            row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate);
+            row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate)
+        {
+            Summary = row.Lead is null
+                ? null
+                : new ThemeResultSummary(JsonSerializer.Deserialize<JsonElement[]>(row.Lead) ?? [])
+        };
     }
 
     private sealed record ThemeSearchRow(
@@ -82,5 +89,6 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         short? MinJudgedForPercentage,
         short? PeriodStartYear,
         short? PeriodEndYear,
-        string? AgreementBasis);
+        string? AgreementBasis,
+        string? Lead);
 }
