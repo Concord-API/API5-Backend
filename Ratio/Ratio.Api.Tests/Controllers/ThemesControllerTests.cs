@@ -28,6 +28,12 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         2026,
         new DateOnly(2026, 8, 30));
 
+    private static readonly ThemeSummary MultiCourtListing = WrongfulListing with
+    {
+        Courts = ["TJMG", "TJSP", "TJRJ"],
+        AdditionalCourtCount = 0
+    };
+
     private static readonly ThemeDetail WrongfulListingDetail = new(
         412,
         "Inscrição indevida em cadastro de inadimplentes",
@@ -146,6 +152,23 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/417");
 
         AssertDescribesLoadedCases(body.GetProperty("provenance"));
+    }
+
+    [Fact]
+    public async Task Returns_the_court_acronyms_and_the_exact_additional_count()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MultiCourtListing]);
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCases);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=cadastro");
+        var theme = body.GetProperty("themes")[0];
+
+        Assert.Equal(["TJMG", "TJSP", "TJRJ"], theme.GetProperty("courts").EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal(0, theme.GetProperty("additionalCourtCount").GetInt32());
     }
 
     [Fact]

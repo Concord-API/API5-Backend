@@ -172,6 +172,8 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(2, theme.Outcome.Rejected);
         Assert.Equal(0.9861m, theme.Outcome.UpheldRatio);
         Assert.Equal("acolhimento da pretensão do autor", theme.Outcome.PolarityLabel);
+        Assert.Equal(["TJSP"], theme.Courts);
+        Assert.Equal(0, theme.AdditionalCourtCount);
         Assert.Equal(new DateOnly(2024, 6, 15), theme.LastDecisionDate);
     }
 

@@ -14,6 +14,10 @@ public sealed record ThemeSummary(
     int? PeriodEndYear,
     DateOnly? LastDecisionDate)
 {
+    public IReadOnlyList<string> Courts { get; init; } = [];
+
+    public int AdditionalCourtCount { get; init; }
+
     public ThemeResultSummary? Summary { get; init; }
 }
 
