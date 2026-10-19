@@ -24,6 +24,8 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         78,
         "Dominante",
         new ThemeOutcome(142, 2, 0.9861m, "acolhimento da pretensão do autor"),
+        2021,
+        2026,
         new DateOnly(2026, 8, 30));
 
     private static readonly ThemeDetail WrongfulListingDetail = new(
@@ -479,6 +481,8 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(2, outcome.GetProperty("rejected").GetInt64());
         Assert.Equal(0.9861m, outcome.GetProperty("upheldRatio").GetDecimal());
         Assert.Equal("acolhimento da pretensão do autor", outcome.GetProperty("polarityLabel").GetString());
+        Assert.Equal(2021, theme.GetProperty("periodStartYear").GetInt32());
+        Assert.Equal(2026, theme.GetProperty("periodEndYear").GetInt32());
         Assert.Equal("2026-08-30", theme.GetProperty("lastDecisionDate").GetString());
     }
 

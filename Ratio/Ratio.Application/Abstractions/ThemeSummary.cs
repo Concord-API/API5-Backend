@@ -8,6 +8,8 @@ public sealed record ThemeSummary(
     int? StrengthScore,
     string? Level,
     ThemeOutcome Outcome,
+    int? PeriodStartYear,
+    int? PeriodEndYear,
     DateOnly? LastDecisionDate);
 
 public sealed record ThemeOutcome(long Upheld, long Rejected, decimal? UpheldRatio, string? PolarityLabel);
