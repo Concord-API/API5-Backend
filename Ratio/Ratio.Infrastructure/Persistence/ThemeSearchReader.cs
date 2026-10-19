@@ -72,7 +72,7 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
 
         var lastDecisionDate = row.LastDecisionDate is null ? (DateOnly?)null : DateOnly.FromDateTime(row.LastDecisionDate.Value);
 
-        var courts = row.CourtCodes ?? [];
+        var courts = row.CourtCodes?.Cast<string>().ToArray() ?? [];
 
         return new ThemeSummary(
             row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, row.Level,
@@ -99,5 +99,5 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         short? PeriodStartYear,
         short? PeriodEndYear,
         string? AgreementBasis,
-        string[]? CourtCodes);
+        Array? CourtCodes);
 }
