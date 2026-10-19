@@ -16,7 +16,8 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
                ts.judged AS Judged, ts.upheld AS Upheld, ts.rejected AS Rejected,
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
-               sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear
+               sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
+               ts.agreement_basis AS AgreementBasis
         FROM {source} s
         JOIN dw.dim_theme t ON t.theme_key = s.theme_key
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
@@ -56,7 +57,8 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         var upheld = row.Upheld ?? 0;
         var rejected = row.Rejected ?? 0;
         var meetsFloor = row.MinJudgedForPercentage is not null && judged >= row.MinJudgedForPercentage;
-        var upheldRatio = meetsFloor ? Math.Round((decimal)upheld / judged, 4) : (decimal?)null;
+        var hasMeritBasis = row.AgreementBasis == "pretensao_autor";
+        var upheldRatio = meetsFloor && hasMeritBasis ? Math.Round((decimal)upheld / judged, 4) : (decimal?)null;
 
         var lastDecisionDate = row.LastDecisionDate is null ? (DateOnly?)null : DateOnly.FromDateTime(row.LastDecisionDate.Value);
 
@@ -79,5 +81,6 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         string? Level,
         short? MinJudgedForPercentage,
         short? PeriodStartYear,
-        short? PeriodEndYear);
+        short? PeriodEndYear,
+        string? AgreementBasis);
 }
