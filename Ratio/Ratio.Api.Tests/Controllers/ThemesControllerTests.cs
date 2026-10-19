@@ -109,6 +109,37 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Returns_only_the_narrative_lead_as_the_summary_of_each_result()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("seguro prestamista", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing with { Summary = new ThemeResultSummary(Lead) }]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=seguro%20prestamista");
+
+        var summary = body.GetProperty("themes")[0].GetProperty("summary");
+        var lead = summary.GetProperty("lead");
+        Assert.Equal(3, lead.GetArrayLength());
+        Assert.Equal("Em ", lead[0].GetProperty("text").GetString());
+        Assert.Equal(0.9861m, lead[1].GetProperty("ratio").GetDecimal());
+        Assert.Equal(144, lead[1].GetProperty("n").GetInt64());
+        Assert.Equal("decisões", lead[1].GetProperty("unit").GetString());
+        Assert.False(summary.TryGetProperty("body", out _));
+    }
+
+    [Fact]
+    public async Task Returns_a_null_summary_for_a_result_without_narrative()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("tarifa bancaria", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=tarifa%20bancaria");
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("themes")[0].GetProperty("summary").ValueKind);
+    }
+
+    [Fact]
     public async Task Returns_the_provenance_of_the_theme()
     {
         factory.ThemeDetailReader

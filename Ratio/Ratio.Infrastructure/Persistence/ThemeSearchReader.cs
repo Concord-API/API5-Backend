@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -19,11 +20,12 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
                sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
-               ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes
+               ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes, n.lead::text AS Lead
         FROM {source} s
         JOIN dw.dim_theme t ON t.theme_key = s.theme_key
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
         LEFT JOIN dw.theme_summary sm ON sm.theme_sk = t.theme_sk
+        LEFT JOIN dw.theme_narrative n ON n.theme_sk = t.theme_sk
         LEFT JOIN dw.strength_config cfg ON cfg.id = 1
         LEFT JOIN LATERAL (
             SELECT array_agg(DISTINCT c.court_code ORDER BY c.court_code) AS codes
@@ -80,7 +82,10 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
             row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate)
         {
             Courts = courts.Take(MaxVisibleCourts).ToArray(),
-            AdditionalCourtCount = Math.Max(0, courts.Length - MaxVisibleCourts)
+            AdditionalCourtCount = Math.Max(0, courts.Length - MaxVisibleCourts),
+            Summary = row.Lead is null
+                ? null
+                : new ThemeResultSummary(JsonSerializer.Deserialize<JsonElement[]>(row.Lead) ?? [])
         };
     }
 
@@ -99,5 +104,6 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         short? PeriodStartYear,
         short? PeriodEndYear,
         string? AgreementBasis,
-        Array? CourtCodes);
+        Array? CourtCodes,
+        string? Lead);
 }
