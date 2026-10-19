@@ -10,6 +10,11 @@ public sealed record ThemeSummary(
     ThemeOutcome Outcome,
     int? PeriodStartYear,
     int? PeriodEndYear,
-    DateOnly? LastDecisionDate);
+    DateOnly? LastDecisionDate)
+{
+    public IReadOnlyList<string> Courts { get; init; } = [];
+
+    public int AdditionalCourtCount { get; init; }
+}
 
 public sealed record ThemeOutcome(long Upheld, long Rejected, decimal? UpheldRatio, string? PolarityLabel);

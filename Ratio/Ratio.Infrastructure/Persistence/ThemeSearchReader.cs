@@ -7,6 +7,8 @@ namespace Ratio.Infrastructure.Persistence;
 
 public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<ThemeSearchReader> logger) : IThemeSearchReader
 {
+    private const int MaxVisibleCourts = 3;
+
     private static readonly string SearchSql = Sql("dw.search_themes(@query, @limit)");
 
     private static readonly string TopSql = Sql("dw.top_themes(@limit)");
@@ -17,12 +19,20 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
                sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
-               ts.agreement_basis AS AgreementBasis
+               ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes
         FROM {source} s
         JOIN dw.dim_theme t ON t.theme_key = s.theme_key
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
         LEFT JOIN dw.theme_summary sm ON sm.theme_sk = t.theme_sk
         LEFT JOIN dw.strength_config cfg ON cfg.id = 1
+        LEFT JOIN LATERAL (
+            SELECT array_agg(DISTINCT c.court_code ORDER BY c.court_code) AS codes
+            FROM dw.bridge_theme_subject bts
+            JOIN dw.bridge_case_subject bcs ON bcs.subject_sk = bts.subject_sk
+            JOIN dw.case_current_result ccr ON ccr.case_sk = bcs.case_sk
+            JOIN dw.dim_court c ON c.court_sk = ccr.court_sk
+            WHERE bts.theme_sk = t.theme_sk
+        ) courts ON true
         ORDER BY s.position
         """;
 
@@ -62,10 +72,16 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
 
         var lastDecisionDate = row.LastDecisionDate is null ? (DateOnly?)null : DateOnly.FromDateTime(row.LastDecisionDate.Value);
 
+        var courts = row.CourtCodes ?? [];
+
         return new ThemeSummary(
             row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, row.Level,
             new ThemeOutcome(upheld, rejected, upheldRatio, row.PolarityLabel),
-            row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate);
+            row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate)
+        {
+            Courts = courts.Take(MaxVisibleCourts).ToArray(),
+            AdditionalCourtCount = Math.Max(0, courts.Length - MaxVisibleCourts)
+        };
     }
 
     private sealed record ThemeSearchRow(
@@ -82,5 +98,6 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         short? MinJudgedForPercentage,
         short? PeriodStartYear,
         short? PeriodEndYear,
-        string? AgreementBasis);
+        string? AgreementBasis,
+        string[]? CourtCodes);
 }
