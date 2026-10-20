@@ -13,7 +13,8 @@ public class ThemesController(
     IThemeDetailReader themeDetailReader,
     IProvenanceReader provenanceReader,
     IDoctrineReader doctrineReader,
-    IScopeReader scopeReader) : ControllerBase
+    IScopeReader scopeReader,
+    ICourtCaseCountReader courtCaseCountReader) : ControllerBase
 {
     [HttpGet("{key:long}")]
     public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
@@ -122,15 +123,17 @@ public class ThemesController(
 
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
+        var filterOptions = new { courts = await courtCaseCountReader.GetAsync(cancellationToken) };
+
         if (string.IsNullOrWhiteSpace(q))
         {
             var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, filters, cancellationToken);
 
-            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance, scope });
+            return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance, scope, filterOptions });
         }
 
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, filters, cancellationToken);
 
-        return Ok(new { query = q, total = themes.Count, themes, provenance, scope });
+        return Ok(new { query = q, total = themes.Count, themes, provenance, scope, filterOptions });
     }
 }
