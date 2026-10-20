@@ -76,12 +76,12 @@ public class ThemesController(
 
         if (string.IsNullOrWhiteSpace(q))
         {
-            var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, cancellationToken);
+            var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, ThemeFilters.None, cancellationToken);
 
             return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance, scope });
         }
 
-        var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
+        var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, ThemeFilters.None, cancellationToken);
 
         return Ok(new { query = q, total = themes.Count, themes, provenance, scope });
     }
