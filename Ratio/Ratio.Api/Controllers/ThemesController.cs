@@ -60,7 +60,7 @@ public class ThemesController(
         ["all"] = null
     };
 
-    private static readonly Dictionary<string, string[]> Instances = new()
+    private static readonly Dictionary<string, string[]> Levels = new()
     {
         ["first"] = ["First", "SpecialCourt"],
         ["second"] = ["Second", "AppealPanel"],
@@ -73,7 +73,7 @@ public class ThemesController(
         [FromQuery] int? limit,
         [FromQuery] string[]? court,
         [FromQuery] string? period,
-        [FromQuery] string? instance,
+        [FromQuery] string? level,
         [FromQuery] int? minStrength,
         CancellationToken cancellationToken)
     {
@@ -98,10 +98,10 @@ public class ThemesController(
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (instance is not null && !Instances.ContainsKey(instance))
+        if (level is not null && !Levels.ContainsKey(level))
         {
             return Problem(
-                detail: "Instância inválida: use first, second ou superior.",
+                detail: "Grau inválido: use first, second ou superior.",
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
@@ -115,7 +115,7 @@ public class ThemesController(
         var filters = new ThemeFilters(
             court is { Length: > 0 } ? court : null,
             period is null ? null : Periods[period],
-            instance is null ? null : Instances[instance],
+            level is null ? null : Levels[level],
             minStrength);
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
