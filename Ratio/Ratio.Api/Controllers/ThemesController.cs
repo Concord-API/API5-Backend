@@ -53,8 +53,29 @@ public class ThemesController(
         });
     }
 
+    private static readonly Dictionary<string, int?> Periods = new()
+    {
+        ["5y"] = 5,
+        ["2y"] = 2,
+        ["all"] = null
+    };
+
+    private static readonly Dictionary<string, string[]> Instances = new()
+    {
+        ["first"] = ["First", "SpecialCourt"],
+        ["second"] = ["Second", "AppealPanel"],
+        ["superior"] = ["Superior"]
+    };
+
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? q, [FromQuery] int? limit, CancellationToken cancellationToken)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? q,
+        [FromQuery] int? limit,
+        [FromQuery] string[]? court,
+        [FromQuery] string? period,
+        [FromQuery] string? instance,
+        [FromQuery] int? minStrength,
+        CancellationToken cancellationToken)
     {
         if (limit is < 1 or > 100)
         {
@@ -70,18 +91,45 @@ public class ThemesController(
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
+        if (period is not null && !Periods.ContainsKey(period))
+        {
+            return Problem(
+                detail: "Período inválido: use 5y, 2y ou all.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (instance is not null && !Instances.ContainsKey(instance))
+        {
+            return Problem(
+                detail: "Instância inválida: use first, second ou superior.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (minStrength is < 0 or > 100)
+        {
+            return Problem(
+                detail: "O parâmetro 'minStrength' deve estar entre 0 e 100.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var filters = new ThemeFilters(
+            court is { Length: > 0 } ? court : null,
+            period is null ? null : Periods[period],
+            instance is null ? null : Instances[instance],
+            minStrength);
+
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
 
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
         if (string.IsNullOrWhiteSpace(q))
         {
-            var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, cancellationToken);
+            var topThemes = await themeSearchReader.TopThemesAsync(limit ?? 20, filters, cancellationToken);
 
             return Ok(new { query = "", total = topThemes.Count, themes = topThemes, provenance, scope });
         }
 
-        var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
+        var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, filters, cancellationToken);
 
         return Ok(new { query = q, total = themes.Count, themes, provenance, scope });
     }

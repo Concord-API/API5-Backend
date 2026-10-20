@@ -80,7 +80,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_scope_with_the_search()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("negativacao", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("negativacao", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=negativacao");
@@ -92,7 +92,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_scope_with_the_top_themes()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(11, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(11, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=11");
@@ -233,7 +233,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_global_provenance_with_the_search()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
         factory.ProvenanceReader
             .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
@@ -248,7 +248,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_global_provenance_with_the_top_themes()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
         factory.ProvenanceReader
             .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
@@ -455,7 +455,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_contract_shape_with_theme_key_never_theme_sk()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("inscricao indevida", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("inscricao indevida", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var response = await _client.GetAsync("/api/themes?q=inscricao+indevida");
@@ -486,7 +486,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_query_and_total_in_the_envelope()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("inscricao indevida", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("inscricao indevida", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var response = await _client.GetAsync("/api/themes?q=inscricao+indevida");
@@ -500,7 +500,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_no_results_as_an_empty_list()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("satelite", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("satelite", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/themes?q=satelite");
@@ -514,7 +514,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_no_top_themes_as_an_empty_list()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(7, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(7, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/themes?limit=7");
@@ -529,14 +529,14 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Defaults_the_limit_to_20_when_absent()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("inscricao", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("inscricao", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/themes?q=inscricao");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         factory.ThemeSearchReader.Verify(
-            reader => reader.SearchThemesAsync("inscricao", 20, It.IsAny<CancellationToken>()), Times.Once);
+            reader => reader.SearchThemesAsync("inscricao", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -568,21 +568,21 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(400, body.GetProperty("status").GetInt32());
         Assert.Equal("Digite ao menos 3 caracteres para buscar.", body.GetProperty("detail").GetString());
         factory.ThemeSearchReader.Verify(
-            reader => reader.SearchThemesAsync(query, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+            reader => reader.SearchThemesAsync(query, It.IsAny<int>(), It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Searches_a_query_with_3_characters()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("abc", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("abc", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/themes?q=abc");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         factory.ThemeSearchReader.Verify(
-            reader => reader.SearchThemesAsync("abc", 20, It.IsAny<CancellationToken>()), Times.Once);
+            reader => reader.SearchThemesAsync("abc", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -592,7 +592,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_top_themes_when_the_query_is_empty(string url, string? query, int limit)
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(limit, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(limit, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var response = await _client.GetAsync(url);
@@ -603,22 +603,88 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(1, body.GetProperty("total").GetInt32());
         Assert.Equal(412, body.GetProperty("themes")[0].GetProperty("themeKey").GetInt64());
         factory.ThemeSearchReader.Verify(
-            reader => reader.TopThemesAsync(limit, It.IsAny<CancellationToken>()), Times.Once);
+            reader => reader.TopThemesAsync(limit, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()), Times.Once);
         factory.ThemeSearchReader.Verify(
-            reader => reader.SearchThemesAsync(query, It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+            reader => reader.SearchThemesAsync(query, It.IsAny<int>(), It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Defaults_the_top_themes_limit_to_20_when_absent()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var response = await _client.GetAsync("/api/themes");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         factory.ThemeSearchReader.Verify(
-            reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()), Times.Once);
+            reader => reader.TopThemesAsync(20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Passes_the_filters_to_the_search()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync(
+                "cobranca filtrada",
+                20,
+                It.Is<ThemeFilters>(filters =>
+                    filters.Courts!.SequenceEqual(new[] { "TJSP", "TJRJ" }) &&
+                    filters.PeriodYears == 5 &&
+                    filters.Levels!.SequenceEqual(new[] { "First", "SpecialCourt" }) &&
+                    filters.MinStrength == 60),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var response = await _client.GetAsync(
+            "/api/themes?q=cobranca%20filtrada&court=TJSP&court=TJRJ&period=5y&instance=first&minStrength=60");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, body.GetProperty("total").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("/api/themes?limit=31&period=2y&instance=second", null, 2, new[] { "Second", "AppealPanel" }, null)]
+    [InlineData("/api/themes?limit=32&period=all&instance=superior", null, null, new[] { "Superior" }, null)]
+    [InlineData("/api/themes?limit=33&court=TJMG&minStrength=0", new[] { "TJMG" }, null, null, 0)]
+    public async Task Passes_the_filters_to_the_top_themes(
+        string url, string[]? courts, int? periodYears, string[]? levels, int? minStrength)
+    {
+        var limit = int.Parse(url.Split("limit=")[1].Split('&')[0]);
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(
+                limit,
+                It.Is<ThemeFilters>(filters =>
+                    (courts == null ? filters.Courts == null : filters.Courts!.SequenceEqual(courts)) &&
+                    filters.PeriodYears == periodYears &&
+                    (levels == null ? filters.Levels == null : filters.Levels!.SequenceEqual(levels)) &&
+                    filters.MinStrength == minStrength),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var response = await _client.GetAsync(url);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, body.GetProperty("total").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("/api/themes?period=10y", "Período inválido: use 5y, 2y ou all.")]
+    [InlineData("/api/themes?q=cobranca&period=5", "Período inválido: use 5y, 2y ou all.")]
+    [InlineData("/api/themes?instance=terceiro", "Instância inválida: use first, second ou superior.")]
+    [InlineData("/api/themes?q=cobranca&instance=First", "Instância inválida: use first, second ou superior.")]
+    [InlineData("/api/themes?minStrength=-1", "O parâmetro 'minStrength' deve estar entre 0 e 100.")]
+    [InlineData("/api/themes?q=cobranca&minStrength=101", "O parâmetro 'minStrength' deve estar entre 0 e 100.")]
+    public async Task Rejects_an_invalid_filter_value(string url, string detail)
+    {
+        var response = await _client.GetAsync(url);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(detail, body.GetProperty("detail").GetString());
     }
 }
