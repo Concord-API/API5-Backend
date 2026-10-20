@@ -670,4 +670,21 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(1, body.GetProperty("total").GetInt32());
     }
+
+    [Theory]
+    [InlineData("/api/themes?period=10y", "Período inválido: use 5y, 2y ou all.")]
+    [InlineData("/api/themes?q=cobranca&period=5", "Período inválido: use 5y, 2y ou all.")]
+    [InlineData("/api/themes?instance=terceiro", "Instância inválida: use first, second ou superior.")]
+    [InlineData("/api/themes?q=cobranca&instance=First", "Instância inválida: use first, second ou superior.")]
+    [InlineData("/api/themes?minStrength=-1", "O parâmetro 'minStrength' deve estar entre 0 e 100.")]
+    [InlineData("/api/themes?q=cobranca&minStrength=101", "O parâmetro 'minStrength' deve estar entre 0 e 100.")]
+    public async Task Rejects_an_invalid_filter_value(string url, string detail)
+    {
+        var response = await _client.GetAsync(url);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(detail, body.GetProperty("detail").GetString());
+    }
 }
