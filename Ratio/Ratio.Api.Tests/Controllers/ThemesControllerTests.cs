@@ -687,4 +687,36 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(detail, body.GetProperty("detail").GetString());
     }
+
+    private static void AssertListsTheCourtCounts(JsonElement filterOptions)
+    {
+        var courts = filterOptions.GetProperty("courts").EnumerateArray().ToArray();
+        Assert.Equal(["TJSP", "TJMG", "TJRJ"], courts.Select(court => court.GetProperty("code").GetString()));
+        Assert.Equal([5412L, 2108L, 0L], courts.Select(court => court.GetProperty("caseCount").GetInt64()));
+        Assert.Equal("Tribunal de Justiça de São Paulo", courts[0].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_the_court_counts_with_the_search()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("contagem", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=contagem");
+
+        AssertListsTheCourtCounts(body.GetProperty("filterOptions"));
+    }
+
+    [Fact]
+    public async Task Returns_the_court_counts_with_the_top_themes()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(41, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=41");
+
+        AssertListsTheCourtCounts(body.GetProperty("filterOptions"));
+    }
 }
