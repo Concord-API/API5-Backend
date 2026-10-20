@@ -91,10 +91,31 @@ public class ThemesController(
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
+        if (period is not null && !Periods.ContainsKey(period))
+        {
+            return Problem(
+                detail: "Período inválido: use 5y, 2y ou all.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (instance is not null && !Instances.ContainsKey(instance))
+        {
+            return Problem(
+                detail: "Instância inválida: use first, second ou superior.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (minStrength is < 0 or > 100)
+        {
+            return Problem(
+                detail: "O parâmetro 'minStrength' deve estar entre 0 e 100.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         var filters = new ThemeFilters(
             court is { Length: > 0 } ? court : null,
-            period is not null && Periods.TryGetValue(period, out var periodYears) ? periodYears : null,
-            instance is not null && Instances.TryGetValue(instance, out var levels) ? levels : null,
+            period is null ? null : Periods[period],
+            instance is null ? null : Instances[instance],
             minStrength);
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
