@@ -638,7 +638,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
             .ReturnsAsync([WrongfulListing]);
 
         var response = await _client.GetAsync(
-            "/api/themes?q=cobranca%20filtrada&court=TJSP&court=TJRJ&period=5y&instance=first&minStrength=60");
+            "/api/themes?q=cobranca%20filtrada&court=TJSP&court=TJRJ&period=5y&level=first&minStrength=60");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -646,8 +646,8 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Theory]
-    [InlineData("/api/themes?limit=31&period=2y&instance=second", null, 2, new[] { "Second", "AppealPanel" }, null)]
-    [InlineData("/api/themes?limit=32&period=all&instance=superior", null, null, new[] { "Superior" }, null)]
+    [InlineData("/api/themes?limit=31&period=2y&level=second", null, 2, new[] { "Second", "AppealPanel" }, null)]
+    [InlineData("/api/themes?limit=32&period=all&level=superior", null, null, new[] { "Superior" }, null)]
     [InlineData("/api/themes?limit=33&court=TJMG&minStrength=0", new[] { "TJMG" }, null, null, 0)]
     public async Task Passes_the_filters_to_the_top_themes(
         string url, string[]? courts, int? periodYears, string[]? levels, int? minStrength)
@@ -674,8 +674,8 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     [Theory]
     [InlineData("/api/themes?period=10y", "Período inválido: use 5y, 2y ou all.")]
     [InlineData("/api/themes?q=cobranca&period=5", "Período inválido: use 5y, 2y ou all.")]
-    [InlineData("/api/themes?instance=terceiro", "Instância inválida: use first, second ou superior.")]
-    [InlineData("/api/themes?q=cobranca&instance=First", "Instância inválida: use first, second ou superior.")]
+    [InlineData("/api/themes?level=terceiro", "Grau inválido: use first, second ou superior.")]
+    [InlineData("/api/themes?q=cobranca&level=First", "Grau inválido: use first, second ou superior.")]
     [InlineData("/api/themes?minStrength=-1", "O parâmetro 'minStrength' deve estar entre 0 e 100.")]
     [InlineData("/api/themes?q=cobranca&minStrength=101", "O parâmetro 'minStrength' deve estar entre 0 e 100.")]
     public async Task Rejects_an_invalid_filter_value(string url, string detail)
@@ -686,5 +686,37 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(detail, body.GetProperty("detail").GetString());
+    }
+
+    private static void AssertListsTheCourtCounts(JsonElement filterOptions)
+    {
+        var courts = filterOptions.GetProperty("courts").EnumerateArray().ToArray();
+        Assert.Equal(["TJSP", "TJMG", "TJRJ"], courts.Select(court => court.GetProperty("code").GetString()));
+        Assert.Equal([5412L, 2108L, 0L], courts.Select(court => court.GetProperty("caseCount").GetInt64()));
+        Assert.Equal("Tribunal de Justiça de São Paulo", courts[0].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_the_court_counts_with_the_search()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("contagem", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=contagem");
+
+        AssertListsTheCourtCounts(body.GetProperty("filterOptions"));
+    }
+
+    [Fact]
+    public async Task Returns_the_court_counts_with_the_top_themes()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(41, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=41");
+
+        AssertListsTheCourtCounts(body.GetProperty("filterOptions"));
     }
 }
