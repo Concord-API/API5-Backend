@@ -186,7 +186,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(40, upheldCount: 2, rejectedCount: 1, dateSk: 20240615, batch: "b");
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("negativacao apos quitacao", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("negativacao apos quitacao", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(2021, theme.PeriodStartYear);
         Assert.Equal(2024, theme.PeriodEndYear);
@@ -200,7 +200,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(41, upheldCount: 2, rejectedCount: 1, dateSk: 20240615, batch: "b");
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.TopThemesAsync(20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(2021, theme.PeriodStartYear);
         Assert.Equal(2024, theme.PeriodEndYear);
@@ -214,7 +214,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertNarrativeAsync(43);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.NotNull(theme.Summary);
         Assert.Equal(3, theme.Summary.Lead.Count);
@@ -233,7 +233,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertNarrativeAsync(44);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.TopThemesAsync(20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
 
         Assert.NotNull(theme.Summary);
         Assert.Equal("Em ", theme.Summary.Lead[0].GetProperty("text").GetString());
@@ -246,7 +246,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(45, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Null(theme.Summary);
     }
@@ -272,7 +272,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(42, upheldCount: 5, rejectedCount: 1, dateSk: 20240615, upheldMovement: 237, rejectedMovement: 239);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("revisao de contrato bancario", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("revisao de contrato bancario", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(6, theme.JudgedCount);
         Assert.Equal(5, theme.Outcome.Upheld);

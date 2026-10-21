@@ -46,7 +46,7 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
         await LoadSampleAsync();
 
         var results = await new ThemeSearchReader(_dataSource, NullLogger<ThemeSearchReader>.Instance)
-            .SearchThemesAsync("cobranca de divida", 20, CancellationToken.None);
+            .SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None);
 
         var theme = Assert.Single(results);
         Assert.True(theme.JudgedCount > 0);
@@ -59,7 +59,7 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
         await LoadSampleAsync();
 
         var results = await new ThemeSearchReader(_dataSource, NullLogger<ThemeSearchReader>.Instance)
-            .TopThemesAsync(20, CancellationToken.None);
+            .TopThemesAsync(20, ThemeFilters.None, CancellationToken.None);
 
         Assert.True(results.Count >= 2);
     }

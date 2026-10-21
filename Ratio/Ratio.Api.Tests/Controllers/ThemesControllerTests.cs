@@ -112,7 +112,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_only_the_narrative_lead_as_the_summary_of_each_result()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("seguro prestamista", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("seguro prestamista", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing with { Summary = new ThemeResultSummary(Lead) }]);
 
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=seguro%20prestamista");
@@ -131,7 +131,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_a_null_summary_for_a_result_without_narrative()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("tarifa bancaria", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("tarifa bancaria", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=tarifa%20bancaria");
@@ -158,7 +158,7 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     public async Task Returns_the_court_acronyms_and_the_exact_additional_count()
     {
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([MultiCourtListing]);
         factory.ProvenanceReader
             .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
