@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Ratio.Infrastructure\Ratio.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\acceptance\sample-load.sql" Link="acceptance\sample-load.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
