@@ -74,8 +74,17 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             var breakdown = await connection.QueryAsync<BreakdownRow>(
                 new CommandDefinition(BreakdownSql, new { themeKey }, cancellationToken: cancellationToken));
 
-            var courtAlignments = await connection.QueryAsync<CourtAlignmentRow>(
-                new CommandDefinition(CourtAlignmentSql, new { themeKey }, cancellationToken: cancellationToken));
+            IReadOnlyList<CourtAlignmentRow> courtAlignments;
+            try
+            {
+                courtAlignments = (await connection.QueryAsync<CourtAlignmentRow>(
+                    new CommandDefinition(CourtAlignmentSql, new { themeKey }, cancellationToken: cancellationToken)))
+                    .AsList();
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+            {
+                courtAlignments = [];
+            }
 
             return Map(row) with
             {
