@@ -132,9 +132,10 @@ jobs:
           Write-Output "Migrations applied: $applied"
           if ($applied -le 0) { exit 1 }
           $ready = Invoke-WebRequest http://127.0.0.1:5000/health/ready -SkipHttpErrorCheck -UseBasicParsing
-          Write-Output $ready.Content
+          $body = [System.Text.Encoding]::UTF8.GetString($ready.RawContentStream.ToArray())
+          Write-Output "$($ready.StatusCode) $body"
           if ($ready.StatusCode -ne 503) { exit 1 }
-          if (($ready.Content | ConvertFrom-Json).reason -ne 'sem carga publicada') { exit 1 }
+          if (($body | ConvertFrom-Json).reason -ne 'sem carga publicada') { exit 1 }
 
       - name: Load the sample
         run: |
