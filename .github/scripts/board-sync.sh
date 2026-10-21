@@ -5,7 +5,7 @@ BOARD_REPO="Concord-API/API-5"
 BOARD_NUMBER=5
 
 task_id() {
-  if [[ "$1" =~ ^([0-9]+\.[0-9]+)- ]]; then
+  if [[ "$1" =~ ^([0-9]+\.[0-9]+|[A-Z]+-[0-9]+)- ]]; then
     echo "${BASH_REMATCH[1]}"
   else
     return 1
@@ -73,7 +73,7 @@ main() {
     fi
   fi
 
-  if [[ "$status" == "Done" ]]; then
+  if [[ "$status" == "Done" ]] && [[ "$(gh issue view "$issue" -R "$BOARD_REPO" --json state --jq .state)" != "CLOSED" ]]; then
     gh issue close "$issue" -R "$BOARD_REPO" --reason completed >/dev/null
   fi
 }

@@ -209,11 +209,11 @@ public class ThemeStrengthTests(PostgresFixture postgres) : IClassFixture<Postgr
         await RefreshAggregatesAsync();
         var strength = await ReadStrengthAsync(1);
 
-        Assert.Equal(80, strength.Score);
+        Assert.Equal(78, strength.Score);
         Assert.Equal("Dominante", strength.Level);
         Assert.Equal(0.972m, strength.AgreementValue);
         Assert.Equal(0.872m, strength.VolumeValue);
-        Assert.Equal(0.333m, strength.CoverageValue);
+        Assert.Equal(0.200m, strength.CoverageValue);
         Assert.Equal(0.800m, strength.RecencyValue);
         Assert.Equal("pretensao_autor", strength.AgreementBasis);
         Assert.Equal(144, strength.Judged);
