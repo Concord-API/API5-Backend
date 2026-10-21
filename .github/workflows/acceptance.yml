@@ -1,0 +1,149 @@
+name: Acceptance
+
+on:
+  push:
+    branches: ['us*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  PGHOST: localhost
+  PGPORT: '5432'
+  PGDATABASE: ratio
+  PGUSER: ratio
+  PGPASSWORD: ratio
+
+jobs:
+  acceptance:
+    name: Acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ratio
+          POSTGRES_USER: ratio
+          POSTGRES_PASSWORD: ratio
+          POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=pt-BR --encoding=UTF8 --locale=C.utf8
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ratio -d ratio"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Pick the frontend branch
+        id: other
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/Concord-API/API5-Frontend.git "$BRANCH" >/dev/null; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: backend
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Concord-API/API5-Frontend
+          ref: ${{ steps.other.outputs.ref }}
+          path: frontend
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: backend/global.json
+          cache: true
+          cache-dependency-path: backend/Ratio/**/packages.lock.json
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: frontend/ratio/.node-version
+          cache: npm
+          cache-dependency-path: frontend/ratio/package-lock.json
+
+      - name: Create the database extensions
+        run: psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+      - name: Publish the API
+        run: dotnet publish backend/Ratio/Ratio.Api/Ratio.Api.csproj --configuration Release -p:RestoreLockedMode=true --output "$RUNNER_TEMP/api"
+
+      - name: Start the API on an empty database
+        working-directory: ${{ runner.temp }}/api
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings__Ratio: Host=localhost;Port=5432;Database=ratio;Username=ratio;Password=ratio
+        run: |
+          nohup dotnet Ratio.Api.dll > "$RUNNER_TEMP/api.out" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:5000/health >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "::error::The API did not answer /health"
+          exit 1
+
+      - name: Check that the API created the schema and reports no load
+        run: |
+          applied=$(psql -tAc "SELECT count(*) FROM migrations.schema_versions")
+          echo "Migrations applied: $applied"
+          test "$applied" -gt 0
+          status=$(curl -s -o ready.json -w '%{http_code}' http://127.0.0.1:5000/health/ready)
+          cat ready.json
+          test "$status" = 503
+          test "$(jq -r .reason ready.json)" = "sem carga publicada"
+
+      - name: Load the sample
+        run: psql -v ON_ERROR_STOP=1 -f backend/acceptance/sample-load.sql
+
+      - name: Check that the API reports the load
+        run: |
+          curl -fsS http://127.0.0.1:5000/health/ready | tee ready.json
+          test "$(jq -r .status ready.json)" = "Pronto"
+
+      - name: Build the frontend
+        working-directory: frontend/ratio
+        run: |
+          npm install --global npm@11.12.1
+          npm ci
+          npm run build
+
+      - name: Serve the frontend behind the reverse proxy
+        run: >
+          docker run -d --name proxy --network host
+          -v "$GITHUB_WORKSPACE/frontend/ratio/apps/web/dist:/usr/share/nginx/html:ro"
+          -v "$GITHUB_WORKSPACE/backend/acceptance/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+          nginx:1.27-alpine
+
+      - name: Check the frontend and the API through the proxy
+        run: |
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root">'
+          curl -fsS http://127.0.0.1:8080/tema/1 | grep -q '<div id="root">'
+          curl -fsS "http://127.0.0.1:8080/api/themes?q=cobranca%20de%20divida" | tee search.json
+          test "$(jq '.themes | length' search.json)" -gt 0
+          curl -fsS http://127.0.0.1:8080/api/themes/1 | jq -e '.name' >/dev/null
+
+      - name: Upload the API log
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: acceptance-api-log-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/api.out
+            ${{ runner.temp }}/api/logs/
+          retention-days: 14
