@@ -424,6 +424,32 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Returns_the_alignment_for_each_court_with_n_and_polarity()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(422, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with
+            {
+                ThemeKey = 422,
+                CourtAlignments =
+                [
+                    new CourtAlignment("TJSP", 10, 0.7m, "acolhimento da pretensão do autor"),
+                    new CourtAlignment("STJ", 4, 0.5m, "provimento do recurso (pretensão do recorrente)")
+                ]
+            });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/422");
+
+        var alignments = body.GetProperty("courtAlignments");
+        Assert.Equal(2, alignments.GetArrayLength());
+        Assert.Equal("TJSP", alignments[0].GetProperty("courtCode").GetString());
+        Assert.Equal(10, alignments[0].GetProperty("n").GetInt64());
+        Assert.Equal(0.7m, alignments[0].GetProperty("percentage").GetDecimal());
+        Assert.Equal("acolhimento da pretensão do autor", alignments[0].GetProperty("polarityLabel").GetString());
+        Assert.Equal("provimento do recurso (pretensão do recorrente)", alignments[1].GetProperty("polarityLabel").GetString());
+    }
+
+    [Fact]
     public async Task Returns_an_empty_outcome_breakdown_for_a_theme_without_judged_cases()
     {
         factory.ThemeDetailReader
