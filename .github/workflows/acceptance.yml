@@ -3,6 +3,11 @@ name: Acceptance
 on:
   push:
     branches: ['us*']
+  pull_request:
+    branches: ['us*']
+    paths:
+      - .github/workflows/acceptance.yml
+      - acceptance/**
 
 permissions:
   contents: read
@@ -14,43 +19,34 @@ concurrency:
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  POSTGRES_VERSION: 16.15
   PGHOST: localhost
-  PGPORT: '5432'
+  PGPORT: '5433'
   PGDATABASE: ratio
   PGUSER: ratio
   PGPASSWORD: ratio
+  PGCLIENTENCODING: UTF8
+  SITE_PATH: C:\inetpub\ratio
+
+defaults:
+  run:
+    shell: pwsh
 
 jobs:
   acceptance:
     name: Acceptance
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: ratio
-          POSTGRES_USER: ratio
-          POSTGRES_PASSWORD: ratio
-          POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=pt-BR --encoding=UTF8 --locale=C.utf8
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ratio -d ratio"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
+    runs-on: windows-2025
+    timeout-minutes: 40
     steps:
       - name: Pick the frontend branch
         id: other
         env:
-          BRANCH: ${{ github.ref_name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          if git ls-remote --exit-code --heads https://github.com/Concord-API/API5-Frontend.git "$BRANCH" >/dev/null; then
-            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=main" >> "$GITHUB_OUTPUT"
-          fi
+          git ls-remote --exit-code --heads https://github.com/Concord-API/API5-Frontend.git $env:BRANCH | Out-Null
+          $ref = if ($LASTEXITCODE -eq 0) { $env:BRANCH } else { 'main' }
+          "ref=$ref" >> $env:GITHUB_OUTPUT
+          exit 0
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -74,76 +70,122 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/ratio/package-lock.json
 
-      - name: Create the database extensions
-        run: psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+      - name: Install PostgreSQL for Windows
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'postgresql.zip'
+          Invoke-WebRequest "https://get.enterprisedb.com/postgresql/postgresql-$env:POSTGRES_VERSION-1-windows-x64-binaries.zip" -OutFile $zip
+          tar -xf $zip -C $env:RUNNER_TEMP
+          $bin = Join-Path $env:RUNNER_TEMP 'pgsql\bin'
+          $bin >> $env:GITHUB_PATH
+          $data = Join-Path $env:RUNNER_TEMP 'pgdata'
+          $password = Join-Path $env:RUNNER_TEMP 'pgpass.txt'
+          Set-Content -Path $password -Value $env:PGPASSWORD -NoNewline
+          & "$bin\initdb.exe" -D $data -U $env:PGUSER --pwfile=$password -A scram-sha-256 --encoding=UTF8 --locale-provider=icu --icu-locale=pt-BR --locale=C
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & "$bin\pg_ctl.exe" -D $data -l (Join-Path $env:RUNNER_TEMP 'postgres.log') -o "-p $env:PGPORT" -w start
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & "$bin\createdb.exe" $env:PGDATABASE
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & "$bin\psql.exe" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Publish the API
-        run: dotnet publish backend/Ratio/Ratio.Api/Ratio.Api.csproj --configuration Release -p:RestoreLockedMode=true --output "$RUNNER_TEMP/api"
+      - name: Install IIS with URL Rewrite and the reverse proxy
+        run: |
+          Install-WindowsFeature Web-Server -IncludeManagementTools | Out-Null
+          $modules = [ordered]@{
+            rewrite = 'https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi'
+            arr = 'https://download.microsoft.com/download/E/9/8/E9849D6A-020E-47E4-9FD0-A023E99B54EB/requestRouter_amd64.msi'
+          }
+          foreach ($module in $modules.GetEnumerator()) {
+            $msi = Join-Path $env:RUNNER_TEMP "$($module.Key).msi"
+            Invoke-WebRequest $module.Value -OutFile $msi
+            $install = Start-Process msiexec.exe -ArgumentList '/i', $msi, '/qn', '/norestart' -Wait -PassThru
+            if ($install.ExitCode -ne 0) { throw "$($module.Key) failed with $($install.ExitCode)" }
+          }
+          & "$env:windir\System32\inetsrv\appcmd.exe" set config -section:system.webServer/proxy /enabled:"True" /commit:apphost
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Publish the API as it ships to the client
+        run: dotnet publish backend/Ratio/Ratio.Api/Ratio.Api.csproj --configuration Release --runtime win-x64 --self-contained true -p:RestoreLockedMode=true --output "$env:RUNNER_TEMP\api"
 
       - name: Start the API on an empty database
-        working-directory: ${{ runner.temp }}/api
-        env:
-          ASPNETCORE_ENVIRONMENT: Production
-          ConnectionStrings__Ratio: Host=localhost;Port=5432;Database=ratio;Username=ratio;Password=ratio
         run: |
-          nohup dotnet Ratio.Api.dll > "$RUNNER_TEMP/api.out" 2>&1 &
-          for _ in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:5000/health >/dev/null 2>&1 && exit 0
-            sleep 2
-          done
-          echo "::error::The API did not answer /health"
+          $api = Join-Path $env:RUNNER_TEMP 'api'
+          $env:ASPNETCORE_ENVIRONMENT = 'Production'
+          $env:ConnectionStrings__Ratio = "Host=$env:PGHOST;Port=$env:PGPORT;Database=$env:PGDATABASE;Username=$env:PGUSER;Password=$env:PGPASSWORD"
+          Start-Process -FilePath "$api\Ratio.Api.exe" -WorkingDirectory $api -RedirectStandardOutput "$env:RUNNER_TEMP\api.out" -RedirectStandardError "$env:RUNNER_TEMP\api.err"
+          foreach ($attempt in 1..60) {
+            try {
+              Invoke-WebRequest http://127.0.0.1:5000/health -UseBasicParsing | Out-Null
+              exit 0
+            } catch {
+              Start-Sleep -Seconds 2
+            }
+          }
+          Write-Output "::error::The API did not answer /health"
           exit 1
 
       - name: Check that the API created the schema and reports no load
         run: |
-          applied=$(psql -tAc "SELECT count(*) FROM migrations.schema_versions")
-          echo "Migrations applied: $applied"
-          test "$applied" -gt 0
-          status=$(curl -s -o ready.json -w '%{http_code}' http://127.0.0.1:5000/health/ready)
-          cat ready.json
-          test "$status" = 503
-          test "$(jq -r .reason ready.json)" = "sem carga publicada"
+          $applied = [int](psql -tAc "SELECT count(*) FROM migrations.schema_versions")
+          Write-Output "Migrations applied: $applied"
+          if ($applied -le 0) { exit 1 }
+          $ready = Invoke-WebRequest http://127.0.0.1:5000/health/ready -SkipHttpErrorCheck -UseBasicParsing
+          Write-Output $ready.Content
+          if ($ready.StatusCode -ne 503) { exit 1 }
+          if (($ready.Content | ConvertFrom-Json).reason -ne 'sem carga publicada') { exit 1 }
 
       - name: Load the sample
-        run: psql -v ON_ERROR_STOP=1 -f backend/acceptance/sample-load.sql
+        run: |
+          psql -v ON_ERROR_STOP=1 -f backend/acceptance/sample-load.sql
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check that the API reports the load
         run: |
-          curl -fsS http://127.0.0.1:5000/health/ready | tee ready.json
-          test "$(jq -r .status ready.json)" = "Pronto"
+          $ready = Invoke-RestMethod http://127.0.0.1:5000/health/ready
+          $ready | ConvertTo-Json
+          if ($ready.status -ne 'Pronto') { exit 1 }
 
       - name: Build the frontend
         working-directory: frontend/ratio
         run: |
           npm install --global npm@11.12.1
           npm ci
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           npm run build
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Serve the frontend behind the reverse proxy
-        run: >
-          docker run -d --name proxy --network host
-          -v "$GITHUB_WORKSPACE/frontend/ratio/apps/web/dist:/usr/share/nginx/html:ro"
-          -v "$GITHUB_WORKSPACE/backend/acceptance/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
-          nginx:1.27-alpine
-
-      - name: Check the frontend and the API through the proxy
+      - name: Serve the frontend from IIS
         run: |
-          for _ in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1 && break
-            sleep 1
-          done
-          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="root">'
-          curl -fsS http://127.0.0.1:8080/tema/1 | grep -q '<div id="root">'
-          curl -fsS "http://127.0.0.1:8080/api/themes?q=cobranca%20de%20divida" | tee search.json
-          test "$(jq '.themes | length' search.json)" -gt 0
-          curl -fsS http://127.0.0.1:8080/api/themes/1 | jq -e '.name' >/dev/null
+          New-Item -ItemType Directory -Path $env:SITE_PATH -Force | Out-Null
+          Copy-Item -Path frontend/ratio/apps/web/dist/* -Destination $env:SITE_PATH -Recurse -Force
+          if (-not (Test-Path "$env:SITE_PATH\web.config")) { throw 'The build has no web.config' }
+          & "$env:windir\System32\inetsrv\appcmd.exe" add site /name:Ratio /physicalPath:$env:SITE_PATH /bindings:http/*:8080:
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Upload the API log
+      - name: Check the frontend and the API through IIS
+        run: |
+          foreach ($path in '/', '/tema/1') {
+            $page = Invoke-WebRequest "http://127.0.0.1:8080$path" -UseBasicParsing
+            if ($page.Content -notmatch '<div id="root">') { throw "$path did not return the app" }
+            Write-Output "$path returned the app"
+          }
+          $search = Invoke-RestMethod 'http://127.0.0.1:8080/api/themes?q=cobranca%20de%20divida'
+          Write-Output "Search returned $($search.themes.Count) theme(s)"
+          if ($search.themes.Count -lt 1) { exit 1 }
+          $theme = Invoke-RestMethod http://127.0.0.1:8080/api/themes/1
+          Write-Output "Theme 1 is $($theme.name)"
+          if (-not $theme.name) { exit 1 }
+
+      - name: Upload the logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: acceptance-api-log-${{ github.sha }}
+          name: acceptance-logs-${{ github.sha }}
           path: |
             ${{ runner.temp }}/api.out
+            ${{ runner.temp }}/api.err
             ${{ runner.temp }}/api/logs/
+            ${{ runner.temp }}/postgres.log
+            C:/inetpub/logs/LogFiles/
           retention-days: 14
