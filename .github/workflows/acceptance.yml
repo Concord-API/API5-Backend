@@ -108,12 +108,13 @@ jobs:
       - name: Publish the API as it ships to the client
         run: dotnet publish backend/Ratio/Ratio.Api/Ratio.Api.csproj --configuration Release --runtime win-x64 --self-contained true -p:RestoreLockedMode=true --output "$env:RUNNER_TEMP\api"
 
-      - name: Start the API on an empty database
+      - name: Start the API as a Windows service on an empty database
         run: |
           $api = Join-Path $env:RUNNER_TEMP 'api'
-          $env:ASPNETCORE_ENVIRONMENT = 'Production'
-          $env:ConnectionStrings__Ratio = "Host=$env:PGHOST;Port=$env:PGPORT;Database=$env:PGDATABASE;Username=$env:PGUSER;Password=$env:PGPASSWORD"
-          Start-Process -FilePath "$api\Ratio.Api.exe" -WorkingDirectory $api -RedirectStandardOutput "$env:RUNNER_TEMP\api.out" -RedirectStandardError "$env:RUNNER_TEMP\api.err"
+          @{ ConnectionStrings = @{ Ratio = "Host=$env:PGHOST;Port=$env:PGPORT;Database=$env:PGDATABASE;Username=$env:PGUSER;Password=$env:PGPASSWORD" } } |
+            ConvertTo-Json | Set-Content -Path "$api\appsettings.Production.json" -Encoding utf8
+          New-Service -Name Ratio -BinaryPathName "`"$api\Ratio.Api.exe`"" -StartupType Manual | Out-Null
+          Start-Service -Name Ratio
           foreach ($attempt in 1..60) {
             try {
               Invoke-WebRequest http://127.0.0.1:5000/health -UseBasicParsing | Out-Null
@@ -177,15 +178,22 @@ jobs:
           Write-Output "Theme 1 is $($theme.name)"
           if (-not $theme.name) { exit 1 }
 
+      - name: Collect the logs
+        if: ${{ failure() }}
+        run: |
+          $logs = New-Item -ItemType Directory -Path acceptance-logs -Force
+          foreach ($source in "$env:RUNNER_TEMP\api\logs", "$env:RUNNER_TEMP\postgres.log", 'C:\inetpub\logs\LogFiles') {
+            if (Test-Path $source) { Copy-Item -Path $source -Destination $logs -Recurse -Force }
+          }
+          Get-Service -Name Ratio -ErrorAction SilentlyContinue | Format-List Name, Status
+          Get-WinEvent -LogName Application -MaxEvents 30 -ErrorAction SilentlyContinue |
+            Where-Object { $_.ProviderName -match 'Ratio|\.NET Runtime|Application Error' } |
+            Format-List TimeCreated, ProviderName, Message
+
       - name: Upload the logs
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: acceptance-logs-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/api.out
-            ${{ runner.temp }}/api.err
-            ${{ runner.temp }}/api/logs/
-            ${{ runner.temp }}/postgres.log
-            C:/inetpub/logs/LogFiles/
+          path: acceptance-logs/
           retention-days: 14
