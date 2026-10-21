@@ -48,7 +48,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V011__theme_outcome_distribution.sql",
         "V012__data_provenance.sql",
         "V013__theme_provenance.sql",
-        "V015__allow_superior_court_level.sql"
+        "V015__allow_superior_court_level.sql",
+        "V016__add_strength_settings.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
