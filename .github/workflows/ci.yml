@@ -40,7 +40,7 @@ jobs:
       - name: Build Release
         run: dotnet build Ratio.slnx --configuration Release --no-restore
       - name: Run tests with disposable PostgreSQL
-        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --logger trx --collect:"XPlat Code Coverage" --results-directory ../TestResults
+        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --logger trx --collect:"XPlat Code Coverage" --results-directory ../TestResults
       - name: Publish self-contained Windows API
         run: dotnet publish Ratio.Api/Ratio.Api.csproj --configuration Release --runtime win-x64 --self-contained true -p:RestoreLockedMode=true --output ../artifacts/api
       - name: Upload test results and coverage
@@ -61,6 +61,7 @@ jobs:
 
   quality:
     name: Backend quality
+    needs: tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -96,6 +97,12 @@ jobs:
         run: |
           dotnet tool restore
           dotnet restore Ratio.slnx --locked-mode
+      - name: Download the test results and coverage
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: backend-test-results-${{ github.sha }}
+          path: QualityResults
       - name: Start the SonarQube Cloud analysis
         if: ${{ env.SONAR_ENABLED == 'true' }}
         run: >
@@ -111,9 +118,6 @@ jobs:
       - name: Build for analysis
         if: ${{ env.SONAR_ENABLED == 'true' }}
         run: dotnet build Ratio.slnx --configuration Release --no-restore
-      - name: Run tests with coverage
-        if: ${{ env.SONAR_ENABLED == 'true' }}
-        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --collect:"XPlat Code Coverage" --logger trx --results-directory "$GITHUB_WORKSPACE/QualityResults"
       - name: Send the analysis and wait for the quality gate
         if: ${{ env.SONAR_ENABLED == 'true' }}
         run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"

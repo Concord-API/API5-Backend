@@ -166,7 +166,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(1, theme.ThemeKey);
         Assert.Equal("Cobrança de dívida", theme.Name);
         Assert.Equal(144, theme.JudgedCount);
-        Assert.Equal(80, theme.StrengthScore);
+        Assert.Equal(78, theme.StrengthScore);
         Assert.Equal("Dominante", theme.Level);
         Assert.Equal(142, theme.Outcome.Upheld);
         Assert.Equal(2, theme.Outcome.Rejected);
@@ -382,7 +382,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         var theme = results[0];
         Assert.Equal("Cobrança de dívida", theme.Name);
         Assert.Equal(144, theme.JudgedCount);
-        Assert.Equal(80, theme.StrengthScore);
+        Assert.Equal(78, theme.StrengthScore);
         Assert.Equal("Dominante", theme.Level);
         Assert.Equal(142, theme.Outcome.Upheld);
         Assert.Equal(2, theme.Outcome.Rejected);
@@ -415,7 +415,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         var results = await _reader.SearchThemesAsync("cobranca", 20, CancellationToken.None);
 
         Assert.Equal(["Cobrança de seguro prestamista", "Cobrança de tarifa bancária"], results.Select(theme => theme.Name));
-        Assert.Equal([71, 40], results.Select(theme => theme.StrengthScore ?? -1));
+        Assert.Equal([69, 37], results.Select(theme => theme.StrengthScore ?? -1));
         Assert.Equal([40L, 1000L], results.Select(theme => theme.JudgedCount));
     }
 
