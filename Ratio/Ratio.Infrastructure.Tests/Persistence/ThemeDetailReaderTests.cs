@@ -71,7 +71,7 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
         Assert.Equal(412, detail.ThemeKey);
         Assert.Equal("Inscrição indevida em cadastro de inadimplentes", detail.Name);
         Assert.Equal("CONSUMIDOR", detail.SubjectArea);
-        Assert.Equal(80, detail.StrengthScore);
+        Assert.Equal(78, detail.StrengthScore);
         Assert.Equal("Dominante", detail.Level);
         Assert.Equal(145, detail.CaseCount);
         Assert.Equal(144, detail.JudgedCount);

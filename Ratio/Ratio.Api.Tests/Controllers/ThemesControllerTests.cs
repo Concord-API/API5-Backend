@@ -24,7 +24,15 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         78,
         "Dominante",
         new ThemeOutcome(142, 2, 0.9861m, "acolhimento da pretensão do autor"),
+        2021,
+        2026,
         new DateOnly(2026, 8, 30));
+
+    private static readonly ThemeSummary MultiCourtListing = WrongfulListing with
+    {
+        Courts = ["TJMG", "TJSP", "TJRJ"],
+        AdditionalCourtCount = 0
+    };
 
     private static readonly ThemeDetail WrongfulListingDetail = new(
         412,
@@ -101,6 +109,37 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Returns_only_the_narrative_lead_as_the_summary_of_each_result()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("seguro prestamista", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing with { Summary = new ThemeResultSummary(Lead) }]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=seguro%20prestamista");
+
+        var summary = body.GetProperty("themes")[0].GetProperty("summary");
+        var lead = summary.GetProperty("lead");
+        Assert.Equal(3, lead.GetArrayLength());
+        Assert.Equal("Em ", lead[0].GetProperty("text").GetString());
+        Assert.Equal(0.9861m, lead[1].GetProperty("ratio").GetDecimal());
+        Assert.Equal(144, lead[1].GetProperty("n").GetInt64());
+        Assert.Equal("decisões", lead[1].GetProperty("unit").GetString());
+        Assert.False(summary.TryGetProperty("body", out _));
+    }
+
+    [Fact]
+    public async Task Returns_a_null_summary_for_a_result_without_narrative()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("tarifa bancaria", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=tarifa%20bancaria");
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("themes")[0].GetProperty("summary").ValueKind);
+    }
+
+    [Fact]
     public async Task Returns_the_provenance_of_the_theme()
     {
         factory.ThemeDetailReader
@@ -113,6 +152,23 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/417");
 
         AssertDescribesLoadedCases(body.GetProperty("provenance"));
+    }
+
+    [Fact]
+    public async Task Returns_the_court_acronyms_and_the_exact_additional_count()
+    {
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("cadastro", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([MultiCourtListing]);
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetGlobalAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCases);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=cadastro");
+        var theme = body.GetProperty("themes")[0];
+
+        Assert.Equal(["TJMG", "TJSP", "TJRJ"], theme.GetProperty("courts").EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal(0, theme.GetProperty("additionalCourtCount").GetInt32());
     }
 
     [Fact]
@@ -479,6 +535,8 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(2, outcome.GetProperty("rejected").GetInt64());
         Assert.Equal(0.9861m, outcome.GetProperty("upheldRatio").GetDecimal());
         Assert.Equal("acolhimento da pretensão do autor", outcome.GetProperty("polarityLabel").GetString());
+        Assert.Equal(2021, theme.GetProperty("periodStartYear").GetInt32());
+        Assert.Equal(2026, theme.GetProperty("periodEndYear").GetInt32());
         Assert.Equal("2026-08-30", theme.GetProperty("lastDecisionDate").GetString());
     }
 
