@@ -95,14 +95,21 @@ jobs:
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
+      SONAR_REQUIRED: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
       SONAR_ORGANIZATION: concord-api
       SONAR_PROJECT_KEY: Concord-API_API5-Backend
     defaults:
       run:
         working-directory: Ratio
     steps:
+      - name: Fail when SonarQube Cloud is not configured on the way to main
+        if: ${{ env.SONAR_TOKEN == '' && env.SONAR_REQUIRED == 'true' }}
+        working-directory: .
+        run: |
+          echo "::error::SONAR_TOKEN is not available and the quality gate is required on the way to main"
+          exit 1
       - name: Skip when SonarQube Cloud is not configured
-        if: ${{ env.SONAR_TOKEN == '' }}
+        if: ${{ env.SONAR_TOKEN == '' && env.SONAR_REQUIRED != 'true' }}
         working-directory: .
         run: echo "::warning::SONAR_TOKEN is not available, the quality analysis was skipped"
       - name: Skip branches that the SonarQube Cloud plan does not analyze
