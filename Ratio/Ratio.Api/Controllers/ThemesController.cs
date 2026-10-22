@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
 using Ratio.Application.Coverage;
 using Ratio.Application.DataSources;
+using Ratio.Application.Filters;
 using Ratio.Application.Unavailable;
 
 namespace Ratio.Api.Controllers;
@@ -14,7 +15,8 @@ public class ThemesController(
     IProvenanceReader provenanceReader,
     IDoctrineReader doctrineReader,
     IScopeReader scopeReader,
-    ICourtCaseCountReader courtCaseCountReader) : ControllerBase
+    ICourtCaseCountReader courtCaseCountReader,
+    ICourtLevelReader courtLevelReader) : ControllerBase
 {
     [HttpGet("{key:long}")]
     public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
@@ -61,13 +63,6 @@ public class ThemesController(
         ["all"] = null
     };
 
-    private static readonly Dictionary<string, string[]> Levels = new()
-    {
-        ["first"] = ["First", "SpecialCourt"],
-        ["second"] = ["Second", "AppealPanel"],
-        ["superior"] = ["Superior"]
-    };
-
     [HttpGet]
     public async Task<IActionResult> Get(
         [FromQuery] string? q,
@@ -99,7 +94,9 @@ public class ThemesController(
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (level is not null && !Levels.ContainsKey(level))
+        string[]? levels = null;
+
+        if (level is not null && !LevelOptions.TryGetLevels(level, out levels))
         {
             return Problem(
                 detail: "Grau inválido: use first, second ou superior.",
@@ -116,14 +113,18 @@ public class ThemesController(
         var filters = new ThemeFilters(
             court is { Length: > 0 } ? court : null,
             period is null ? null : Periods[period],
-            level is null ? null : Levels[level],
+            levels,
             minStrength);
 
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetGlobalAsync(cancellationToken));
 
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
 
-        var filterOptions = new { courts = await courtCaseCountReader.GetAsync(cancellationToken) };
+        var filterOptions = new
+        {
+            courts = await courtCaseCountReader.GetAsync(cancellationToken),
+            levels = LevelOptions.Describe(await courtLevelReader.GetAsync(cancellationToken))
+        };
 
         if (string.IsNullOrWhiteSpace(q))
         {
