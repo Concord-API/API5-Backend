@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry;
 using OpenTelemetry.Metrics;
 
 namespace Ratio.Api.Tests.Observability;
@@ -36,5 +38,23 @@ public class MetricsExportTests
         var exception = Assert.Throws<InvalidOperationException>(() => configured.CreateClient());
 
         Assert.Contains("OpenTelemetry__Endpoint", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("http.server.request.duration")]
+    [InlineData("dotnet.process.cpu.count")]
+    public async Task Exports_the_http_and_runtime_meters(string metricName)
+    {
+        var exported = new List<Metric>();
+        using var factory = new ApiFactory();
+        using var configured = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("OpenTelemetry:Endpoint", "http://127.0.0.1:4317")
+            .ConfigureTestServices(services =>
+                services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(exported))));
+
+        await configured.CreateClient().GetAsync("/health");
+        configured.Services.GetRequiredService<MeterProvider>().ForceFlush();
+
+        Assert.Contains(exported, metric => metric.Name == metricName);
     }
 }
