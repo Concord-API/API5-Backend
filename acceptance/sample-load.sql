@@ -99,5 +99,6 @@ REFRESH MATERIALIZED VIEW dw.theme_summary;
 REFRESH MATERIALIZED VIEW dw.theme_strength;
 REFRESH MATERIALIZED VIEW dw.theme_outcome_distribution;
 REFRESH MATERIALIZED VIEW dw.data_provenance;
+REFRESH MATERIALIZED VIEW dw.theme_by_court;
 
 COMMIT;
