@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   pull_request:
-    branches: ['us*']
+    branches: [main, 'us*']
   push:
     branches: [main]
   workflow_dispatch:
@@ -95,7 +95,6 @@ jobs:
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
-      SONAR_WAIT_GATE: ${{ github.event_name == 'pull_request' }}
       SONAR_ORGANIZATION: concord-api
       SONAR_PROJECT_KEY: Concord-API_API5-Backend
     defaults:
@@ -147,7 +146,7 @@ jobs:
           /d:sonar.token="$SONAR_TOKEN"
           /d:sonar.cs.opencover.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/coverage.opencover.xml"
           /d:sonar.cs.vstest.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/*.trx"
-          /d:sonar.qualitygate.wait="$SONAR_WAIT_GATE"
+          /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
       - name: Build for analysis
         if: ${{ env.SONAR_ENABLED == 'true' }}
