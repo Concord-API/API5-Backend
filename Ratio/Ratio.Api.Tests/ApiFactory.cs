@@ -22,6 +22,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public Mock<ICourtCaseCountReader> CourtCaseCountReader { get; } = new();
 
+    public Mock<ICourtLevelReader> CourtLevelReader { get; } = new();
+
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
     public static LoadedProvenance LoadedCases { get; } = new(
@@ -42,6 +44,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         new("TJRJ", "Tribunal de Justiça do Rio de Janeiro", 0)
     ];
 
+    public static IReadOnlyList<string> LoadedLevels { get; } = ["First", "Second"];
+
     public ApiFactory()
     {
         DatabaseMigrator.Setup(migrator => migrator.MigrateAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -50,6 +54,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         DoctrineReader.Setup(reader => reader.GetRelatedAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         ScopeReader.Setup(reader => reader.GetCourtsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Courts);
         CourtCaseCountReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(CourtCaseCounts);
+        CourtLevelReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(LoadedLevels);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -65,6 +70,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(DoctrineReader.Object);
             services.AddSingleton(ScopeReader.Object);
             services.AddSingleton(CourtCaseCountReader.Object);
+            services.AddSingleton(CourtLevelReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });

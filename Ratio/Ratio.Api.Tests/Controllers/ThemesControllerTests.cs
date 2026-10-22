@@ -777,4 +777,48 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
 
         AssertListsTheCourtCounts(body.GetProperty("filterOptions"));
     }
+
+    [Fact]
+    public async Task Offers_only_the_loaded_levels_with_the_search()
+    {
+        factory.CourtLevelReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(["First", "AppealPanel"]);
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync("graus", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?q=graus");
+
+        var levels = body.GetProperty("filterOptions").GetProperty("levels").EnumerateArray().ToArray();
+        Assert.Equal(["first", "second"], levels.Select(level => level.GetProperty("code").GetString()));
+        Assert.Equal(["Primeiro grau", "Segundo grau"], levels.Select(level => level.GetProperty("label").GetString()));
+    }
+
+    [Fact]
+    public async Task Offers_the_superior_level_with_the_top_themes_when_it_is_loaded()
+    {
+        factory.CourtLevelReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(["Second", "Superior"]);
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(42, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=42");
+
+        var levels = body.GetProperty("filterOptions").GetProperty("levels").EnumerateArray().ToArray();
+        Assert.Equal(["second", "superior"], levels.Select(level => level.GetProperty("code").GetString()));
+        Assert.Equal("Superior", levels[1].GetProperty("label").GetString());
+    }
+
+    [Fact]
+    public async Task Leaves_out_the_superior_level_when_only_state_courts_are_loaded()
+    {
+        factory.CourtLevelReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(["First", "Second", "SpecialCourt"]);
+        factory.ThemeSearchReader
+            .Setup(reader => reader.TopThemesAsync(43, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([WrongfulListing]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes?limit=43");
+
+        var levels = body.GetProperty("filterOptions").GetProperty("levels").EnumerateArray();
+        Assert.DoesNotContain(levels, level => level.GetProperty("code").GetString() == "superior");
+    }
 }
