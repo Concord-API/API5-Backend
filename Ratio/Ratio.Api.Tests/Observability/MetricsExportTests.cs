@@ -26,4 +26,15 @@ public class MetricsExportTests
 
         Assert.NotNull(configured.Services.GetService<MeterProvider>());
     }
+
+    [Fact]
+    public void Refuses_to_start_with_an_invalid_endpoint()
+    {
+        using var factory = new ApiFactory();
+        using var configured = WithEndpoint(factory, "não-é-uri");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => configured.CreateClient());
+
+        Assert.Contains("OpenTelemetry__Endpoint", exception.Message);
+    }
 }
