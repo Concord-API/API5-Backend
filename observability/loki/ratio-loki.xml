@@ -3,7 +3,8 @@
   <name>Ratio Loki</name>
   <description>Armazena e pesquisa os logs do Ratio.</description>
   <executable>%BASE%\loki.exe</executable>
-  <arguments>-config.file="%BASE%\loki.yml"</arguments>
+  <arguments>-config.file="%BASE%\loki.yml" -config.expand-env=true</arguments>
+  <env name="LOKI_DATA_DIR" value="C:\ProgramData\Ratio\observability\loki\data" />
   <startmode>Automatic</startmode>
   <stoptimeout>60 sec</stoptimeout>
   <onfailure action="restart" delay="10 sec" />

@@ -8,11 +8,11 @@ server:
 
 common:
   instance_addr: 127.0.0.1
-  path_prefix: C:/ProgramData/Ratio/observability/loki/data
+  path_prefix: ${LOKI_DATA_DIR}
   storage:
     filesystem:
-      chunks_directory: C:/ProgramData/Ratio/observability/loki/data/chunks
-      rules_directory: C:/ProgramData/Ratio/observability/loki/data/rules
+      chunks_directory: ${LOKI_DATA_DIR}/chunks
+      rules_directory: ${LOKI_DATA_DIR}/rules
   replication_factor: 1
   ring:
     kvstore:
@@ -32,7 +32,7 @@ limits_config:
   retention_period: 360h
 
 compactor:
-  working_directory: C:/ProgramData/Ratio/observability/loki/data/compactor
+  working_directory: ${LOKI_DATA_DIR}/compactor
   retention_enabled: true
   delete_request_store: filesystem
 
