@@ -10,7 +10,15 @@ public static class ObservabilityExtensions
     public static Uri? ReadOtlpEndpoint(this IConfiguration configuration)
     {
         var value = configuration["OpenTelemetry:Endpoint"];
-        return string.IsNullOrWhiteSpace(value) ? null : new Uri(value, UriKind.Absolute);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(value, UriKind.Absolute, out var endpoint)
+            ? endpoint
+            : throw new InvalidOperationException(
+                $"OpenTelemetry endpoint '{value}' is not an absolute URI. Set OpenTelemetry__Endpoint.");
     }
 
     public static IServiceCollection AddRatioObservability(this IServiceCollection services, Uri? otlpEndpoint)
