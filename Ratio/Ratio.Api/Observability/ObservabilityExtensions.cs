@@ -7,6 +7,13 @@ public static class ObservabilityExtensions
 {
     private const string ServiceName = "ratio-api";
 
+    private static readonly string[] Meters =
+    [
+        "Microsoft.AspNetCore.Hosting",
+        "Microsoft.AspNetCore.Server.Kestrel",
+        "System.Runtime"
+    ];
+
     public static Uri? ReadOtlpEndpoint(this IConfiguration configuration)
     {
         var value = configuration["OpenTelemetry:Endpoint"];
@@ -30,7 +37,9 @@ public static class ObservabilityExtensions
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(ServiceName))
-            .WithMetrics(metrics => metrics.AddOtlpExporter(options => options.Endpoint = otlpEndpoint));
+            .WithMetrics(metrics => metrics
+                .AddMeter(Meters)
+                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint));
         return services;
     }
 }
