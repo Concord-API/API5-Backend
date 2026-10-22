@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Ratio.Api;
 using Ratio.Api.Hosting;
+using Ratio.Api.Observability;
 using Ratio.Infrastructure;
 using Serilog;
 
@@ -18,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 string connectionString;
 string[] allowedOrigins;
+Uri? otlpEndpoint;
 using (var startupLogger = new LoggerConfiguration().ReadFrom.Configuration(builder.Configuration).CreateLogger())
 {
     try
@@ -25,6 +27,7 @@ using (var startupLogger = new LoggerConfiguration().ReadFrom.Configuration(buil
         connectionString = builder.Configuration.GetConnectionString("Ratio")
             ?? throw new InvalidOperationException("Connection string 'Ratio' is not configured. Set ConnectionStrings__Ratio.");
         allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        otlpEndpoint = builder.Configuration.ReadOtlpEndpoint();
     }
     catch (Exception exception)
     {
@@ -72,6 +75,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddRatioObservability(otlpEndpoint);
 builder.Services.AddHostedService<DatabaseMigrationService>();
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context => ProblemDetailsTitles.Localize(context.ProblemDetails));
