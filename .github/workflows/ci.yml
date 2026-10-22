@@ -120,6 +120,12 @@ jobs:
         if: ${{ env.SONAR_ENABLED == 'true' }}
         with:
           fetch-depth: 0
+      - name: Use the last release as the analysis version
+        if: ${{ env.SONAR_ENABLED == 'true' && github.ref == 'refs/heads/main' }}
+        working-directory: .
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
+          if [ -n "$tag" ]; then echo "SONAR_VERSION_ARG=/v:${tag#v}" >> "$GITHUB_ENV"; fi
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         if: ${{ env.SONAR_ENABLED == 'true' }}
         with:
@@ -155,6 +161,7 @@ jobs:
           /d:sonar.cs.vstest.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/*.trx"
           /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
+          $SONAR_VERSION_ARG
       - name: Build for analysis
         if: ${{ env.SONAR_ENABLED == 'true' }}
         run: dotnet build Ratio.slnx --configuration Release --no-restore
