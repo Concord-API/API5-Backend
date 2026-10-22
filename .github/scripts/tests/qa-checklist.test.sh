@@ -24,6 +24,12 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  if grep -qF -- "$2" <<<"$3"; then
+    fail "$1 (unexpected '$2')"
+  fi
+}
+
 run() {
   local body="$1"
   shift
@@ -39,7 +45,8 @@ run "" BASE=main HEAD_REF=us3
 assert_eq "a US branch into main exits cleanly" 0 "$status"
 assert_contains "a US branch into main receives the checklist" "$heading" "$output"
 assert_contains "the checklist asks for the exploratory session" "Teste exploratório" "$output"
-assert_contains "the checklist asks for the PO acceptance" "Aceite do PO" "$output"
+assert_not_contains "the checklist is a self-review without the PO acceptance" "Aceite do PO" "$output"
+assert_not_contains "the checklist does not ask for someone else to test" "não implementou" "$output"
 
 run "" BASE=us3 HEAD_REF=3.4-Build-the-result-item
 assert_eq "a task into a US branch exits cleanly" 0 "$status"
