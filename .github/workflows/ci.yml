@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   pull_request:
-    branches: ['us*']
+    branches: [main, 'us*']
   push:
     branches: [main]
   workflow_dispatch:
@@ -39,8 +39,8 @@ jobs:
         run: dotnet format Ratio.slnx --verify-no-changes --no-restore
       - name: Build Release
         run: dotnet build Ratio.slnx --configuration Release --no-restore
-      - name: Run tests with disposable PostgreSQL
-        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --logger trx --collect:"XPlat Code Coverage" --results-directory ../TestResults
+      - name: Run application tests
+        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --filter "FullyQualifiedName!~Ratio.Infrastructure.Tests" --logger trx --collect:"XPlat Code Coverage" --results-directory ../TestResults
       - name: Publish self-contained Windows API
         run: dotnet publish Ratio.Api/Ratio.Api.csproj --configuration Release --runtime win-x64 --self-contained true -p:RestoreLockedMode=true --output ../artifacts/api
       - name: Upload test results and coverage
@@ -59,23 +59,57 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  database:
+    name: Database checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Ratio
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: Ratio/**/packages.lock.json
+      - name: Restore locked dependencies
+        run: dotnet restore Ratio.slnx --locked-mode
+      - name: Build Release
+        run: dotnet build Ratio.slnx --configuration Release --no-restore
+      - name: Run database tests with disposable PostgreSQL
+        run: dotnet test Ratio.Infrastructure.Tests/Ratio.Infrastructure.Tests.csproj --configuration Release --no-build --no-restore --settings coverage.runsettings --logger trx --collect:"XPlat Code Coverage" --results-directory ../DatabaseTestResults
+      - name: Upload database test results and coverage
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-database-test-results-${{ github.sha }}
+          path: DatabaseTestResults/
+          retention-days: 14
+
   quality:
     name: Backend quality
-    needs: tests
+    needs: [tests, database]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
-      SONAR_WAIT_GATE: ${{ github.event_name == 'pull_request' }}
+      SONAR_REQUIRED: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
       SONAR_ORGANIZATION: concord-api
       SONAR_PROJECT_KEY: Concord-API_API5-Backend
     defaults:
       run:
         working-directory: Ratio
     steps:
+      - name: Fail when SonarQube Cloud is not configured on the way to main
+        if: ${{ env.SONAR_TOKEN == '' && env.SONAR_REQUIRED == 'true' }}
+        working-directory: .
+        run: |
+          echo "::error::SONAR_TOKEN is not available and the quality gate is required on the way to main"
+          exit 1
       - name: Skip when SonarQube Cloud is not configured
-        if: ${{ env.SONAR_TOKEN == '' }}
+        if: ${{ env.SONAR_TOKEN == '' && env.SONAR_REQUIRED != 'true' }}
         working-directory: .
         run: echo "::warning::SONAR_TOKEN is not available, the quality analysis was skipped"
       - name: Skip branches that the SonarQube Cloud plan does not analyze
@@ -86,6 +120,12 @@ jobs:
         if: ${{ env.SONAR_ENABLED == 'true' }}
         with:
           fetch-depth: 0
+      - name: Use the last release as the analysis version
+        if: ${{ env.SONAR_ENABLED == 'true' && github.ref == 'refs/heads/main' }}
+        working-directory: .
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
+          if [ -n "$tag" ]; then echo "SONAR_VERSION_ARG=/v:${tag#v}" >> "$GITHUB_ENV"; fi
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         if: ${{ env.SONAR_ENABLED == 'true' }}
         with:
@@ -102,7 +142,13 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: backend-test-results-${{ github.sha }}
-          path: QualityResults
+          path: QualityResults/application
+      - name: Download database test results and coverage
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: backend-database-test-results-${{ github.sha }}
+          path: QualityResults/database
       - name: Start the SonarQube Cloud analysis
         if: ${{ env.SONAR_ENABLED == 'true' }}
         run: >
@@ -112,9 +158,10 @@ jobs:
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.token="$SONAR_TOKEN"
           /d:sonar.cs.opencover.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/coverage.opencover.xml"
-          /d:sonar.cs.vstest.reportsPaths="$GITHUB_WORKSPACE/QualityResults/*.trx"
-          /d:sonar.qualitygate.wait="$SONAR_WAIT_GATE"
+          /d:sonar.cs.vstest.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/*.trx"
+          /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
+          $SONAR_VERSION_ARG
       - name: Build for analysis
         if: ${{ env.SONAR_ENABLED == 'true' }}
         run: dotnet build Ratio.slnx --configuration Release --no-restore
