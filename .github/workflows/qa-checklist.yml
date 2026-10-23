@@ -1,0 +1,49 @@
+name: QA checklist
+
+on:
+  pull_request:
+    branches: [main, 'us*']
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-checklist-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: QA checklist script tests
+    if: ${{ github.base_ref != 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run the QA checklist tests
+        run: bash .github/scripts/tests/qa-checklist.test.sh
+
+  checklist:
+    name: QA checklist
+    if: ${{ github.base_ref == 'main' && github.event.action != 'synchronize' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BASE: ${{ github.base_ref }}
+      HEAD_REF: ${{ github.head_ref }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Add the QA checklist to the pull request
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > "$RUNNER_TEMP/current.md"
+          bash .github/scripts/qa-checklist.sh < "$RUNNER_TEMP/current.md" > "$RUNNER_TEMP/next.md"
+          if cmp -s <(printf '%s' "$(cat "$RUNNER_TEMP/current.md")") "$RUNNER_TEMP/next.md"; then
+            echo "This pull request does not need the QA checklist or already has it"
+            exit 0
+          fi
+          gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/next.md"
