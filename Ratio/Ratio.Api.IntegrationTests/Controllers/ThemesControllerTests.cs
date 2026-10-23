@@ -89,4 +89,14 @@ public class ThemesControllerTests(PostgresFixture postgres) : IClassFixture<Pos
         var source = Assert.Single(body.GetProperty("provenance").GetProperty("sources").EnumerateArray());
         Assert.Equal(40, source.GetProperty("count").GetInt64());
     }
+
+    [Fact]
+    public async Task Answers_not_found_for_an_unknown_theme_key()
+    {
+        var response = await _client.GetAsync("/api/themes/999999");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("Tema não encontrado.", body.GetProperty("detail").GetString());
+    }
 }
