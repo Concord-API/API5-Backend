@@ -41,7 +41,9 @@ public static class ObservabilityExtensions
             .WithMetrics(metrics => metrics
                 .AddMeter(Meters)
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
-            .WithLogging(logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint));
+            .WithLogging(
+                logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint),
+                options => options.IncludeFormattedMessage = true);
         return services;
     }
 }
