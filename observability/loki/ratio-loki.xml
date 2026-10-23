@@ -1,0 +1,23 @@
+<service>
+  <id>ratio-loki</id>
+  <name>Ratio Loki</name>
+  <description>Armazena e pesquisa os logs do Ratio.</description>
+  <executable>%BASE%\loki.exe</executable>
+  <arguments>-config.file="%BASE%\loki.yml" -config.expand-env=true</arguments>
+  <env name="LOKI_DATA_DIR" value="C:\ProgramData\Ratio\observability\loki\data" />
+  <startmode>Automatic</startmode>
+  <stoptimeout>60 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>C:\ProgramData\Ratio\observability\loki\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+</service>
