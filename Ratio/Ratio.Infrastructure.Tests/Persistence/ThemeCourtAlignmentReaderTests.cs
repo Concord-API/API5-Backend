@@ -66,6 +66,7 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
             REFRESH MATERIALIZED VIEW dw.theme_strength;
             REFRESH MATERIALIZED VIEW dw.theme_outcome_distribution;
             REFRESH MATERIALIZED VIEW dw.theme_by_court;
+            REFRESH MATERIALIZED VIEW dw.theme_court_activity;
             """);
     }
 
@@ -85,8 +86,16 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
         Assert.NotNull(detail);
         Assert.Equal(
             [
-                new CourtAlignment("STJ", 4, 0.5m, "provimento do recurso (pretensão do recorrente)"),
+                new CourtAlignment("STJ", 4, 0.5m, "provimento do recurso (pretensão do recorrente)")
+                {
+                    Decisions = 4,
+                    LastDecisionDate = new DateOnly(2026, 1, 1)
+                },
                 new CourtAlignment("TJSP", 4, 0.75m, "acolhimento da pretensão do autor")
+                {
+                    Decisions = 4,
+                    LastDecisionDate = new DateOnly(2026, 1, 1)
+                }
             ],
             detail.CourtAlignments);
         Assert.Equal(
@@ -136,5 +145,17 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
         var superior = Assert.Single(detail!.CourtAlignments, alignment => alignment.CourtCode == "STJ");
         Assert.Equal(4, superior.N);
         Assert.Null(superior.Percentage);
+    }
+
+    [Fact]
+    public async Task Keeps_the_alignment_when_the_activity_was_never_refreshed()
+    {
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_court_activity WITH NO DATA");
+
+        var detail = await _reader.GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal(2, detail.CourtAlignments.Count);
+        Assert.All(detail.CourtAlignments, alignment => Assert.Null(alignment.LastDecisionDate));
     }
 }
