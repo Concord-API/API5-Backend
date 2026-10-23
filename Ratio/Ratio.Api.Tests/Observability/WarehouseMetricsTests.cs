@@ -62,6 +62,12 @@ public class WarehouseMetricsTests
         return availability;
     }
 
+    private static double[] Age(IEnumerable<MetricSnapshot> exported) =>
+        exported.Where(metric => metric.Name == "ratio.warehouse.last_extraction.age")
+            .SelectMany(metric => metric.MetricPoints)
+            .Select(point => point.GetGaugeLastValueDouble())
+            .ToArray();
+
     [Fact]
     public void Does_not_query_the_warehouse_for_metrics_without_an_endpoint()
     {
@@ -86,5 +92,29 @@ public class WarehouseMetricsTests
         var expected = new Dictionary<string, long> { ["ready"] = 0, ["empty"] = 0, ["unavailable"] = 0 };
         expected[state] = 1;
         Assert.Equal(expected, Availability(exported));
+    }
+
+    [Fact]
+    public void Exports_the_age_of_the_last_extraction_in_seconds()
+    {
+        using var factory = new ApiFactory();
+
+        var exported = ExportAfterStartup(
+            factory, LastExtraction.At(DateTimeOffset.UtcNow.AddHours(-2)), "http://127.0.0.1:4317");
+
+        var age = Assert.Single(Age(exported));
+        Assert.InRange(age, 7200, 7260);
+    }
+
+    [Theory]
+    [InlineData(WarehouseAvailability.Empty)]
+    [InlineData(WarehouseAvailability.Unavailable)]
+    public void Exports_no_age_without_a_published_extraction(WarehouseAvailability availability)
+    {
+        using var factory = new ApiFactory();
+
+        var exported = ExportAfterStartup(factory, Extraction(availability), "http://127.0.0.1:4317");
+
+        Assert.Empty(Age(exported));
     }
 }
