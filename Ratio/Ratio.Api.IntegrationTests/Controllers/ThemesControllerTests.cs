@@ -57,4 +57,15 @@ public class ThemesControllerTests(PostgresFixture postgres) : IClassFixture<Pos
         Assert.Equal("TJMG, TJRJ e TJSP", scope.GetProperty("statement").GetString());
         Assert.Equal("cível", scope.GetProperty("subject").GetString());
     }
+
+    [Fact]
+    public async Task Lists_the_judged_themes_without_a_search_term()
+    {
+        var response = await _client.GetAsync("/api/themes");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(3, body.GetProperty("total").GetInt32());
+        Assert.Equal(new long[] { 1, 2, 3 }, body.GetProperty("themes").EnumerateArray().Select(theme => theme.GetProperty("themeKey").GetInt64()));
+    }
 }
