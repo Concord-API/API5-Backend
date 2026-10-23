@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Ratio.Api.Observability;
 using Ratio.Application.Abstractions;
 using Ratio.Application.Coverage;
 using Ratio.Application.DataSources;
@@ -13,7 +14,8 @@ public class ThemesController(
     IThemeDetailReader themeDetailReader,
     IProvenanceReader provenanceReader,
     IDoctrineReader doctrineReader,
-    IScopeReader scopeReader) : ControllerBase
+    IScopeReader scopeReader,
+    SearchMetrics searchMetrics) : ControllerBase
 {
     [HttpGet("{key:long}")]
     public async Task<IActionResult> GetByKey(long key, CancellationToken cancellationToken)
@@ -82,6 +84,10 @@ public class ThemesController(
         }
 
         var themes = await themeSearchReader.SearchThemesAsync(q, limit ?? 20, cancellationToken);
+        if (themes.Count == 0)
+        {
+            searchMetrics.RecordEmptyResult();
+        }
 
         return Ok(new { query = q, total = themes.Count, themes, provenance, scope });
     }
