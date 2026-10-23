@@ -20,6 +20,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public Mock<IDoctrineReader> DoctrineReader { get; } = new();
     public Mock<IScopeReader> ScopeReader { get; } = new();
 
+    public Mock<IPanelAlignmentReader> PanelAlignmentReader { get; } = new();
+
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
     public static LoadedProvenance LoadedCases { get; } = new(
@@ -54,6 +56,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(ProvenanceReader.Object);
             services.AddSingleton(DoctrineReader.Object);
             services.AddSingleton(ScopeReader.Object);
+            services.AddSingleton(PanelAlignmentReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });
