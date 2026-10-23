@@ -112,4 +112,23 @@ public class ThemePanelsControllerTests(PostgresFixture postgres) : IClassFixtur
         Assert.Equal(46.2m, Panel(court, "12ª Câmara de Direito Privado").GetProperty("distanceInPoints").GetDecimal());
         Assert.False(Panel(court, "12ª Câmara de Direito Privado").GetProperty("divergent").GetBoolean());
     }
+
+    [Fact]
+    public async Task Leaves_a_single_judgment_and_the_bodies_that_are_not_panels_outside_the_panels()
+    {
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/1/panels");
+
+        var court = Assert.Single(body.GetProperty("courts").EnumerateArray());
+        var names = court.GetProperty("panels").EnumerateArray().Select(panel => panel.GetProperty("name").GetString());
+        Assert.Equal(
+            new string?[]
+            {
+                "3ª Câmara de Direito Privado",
+                "5ª Câmara de Direito Privado",
+                "8ª Câmara de Direito Privado",
+                "12ª Câmara de Direito Privado"
+            },
+            names);
+        Assert.Equal(4, court.GetProperty("outsidePanels").GetInt64());
+    }
 }
