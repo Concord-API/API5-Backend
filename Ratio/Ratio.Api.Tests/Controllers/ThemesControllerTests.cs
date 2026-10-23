@@ -433,7 +433,11 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
                 ThemeKey = 422,
                 CourtAlignments =
                 [
-                    new CourtAlignment("TJSP", 10, 0.7m, "acolhimento da pretensão do autor"),
+                    new CourtAlignment("TJSP", 10, 0.7m, "acolhimento da pretensão do autor")
+                    {
+                        Decisions = 12,
+                        LastDecisionDate = new DateOnly(2026, 8, 30)
+                    },
                     new CourtAlignment("STJ", 4, 0.5m, "provimento do recurso (pretensão do recorrente)")
                 ]
             });
@@ -446,6 +450,9 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(10, alignments[0].GetProperty("n").GetInt64());
         Assert.Equal(0.7m, alignments[0].GetProperty("percentage").GetDecimal());
         Assert.Equal("acolhimento da pretensão do autor", alignments[0].GetProperty("polarityLabel").GetString());
+        Assert.Equal(12, alignments[0].GetProperty("decisions").GetInt64());
+        Assert.Equal("2026-08-30", alignments[0].GetProperty("lastDecisionDate").GetString());
+        Assert.Equal(JsonValueKind.Null, alignments[1].GetProperty("lastDecisionDate").ValueKind);
         Assert.Equal("provimento do recurso (pretensão do recorrente)", alignments[1].GetProperty("polarityLabel").GetString());
     }
 

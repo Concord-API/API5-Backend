@@ -66,6 +66,7 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
             REFRESH MATERIALIZED VIEW dw.theme_strength;
             REFRESH MATERIALIZED VIEW dw.theme_outcome_distribution;
             REFRESH MATERIALIZED VIEW dw.theme_by_court;
+            REFRESH MATERIALIZED VIEW dw.theme_court_activity;
             """);
     }
 
@@ -85,8 +86,16 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
         Assert.NotNull(detail);
         Assert.Equal(
             [
-                new CourtAlignment("STJ", 4, 0.5m, "provimento do recurso (pretensão do recorrente)"),
+                new CourtAlignment("STJ", 4, 0.5m, "provimento do recurso (pretensão do recorrente)")
+                {
+                    Decisions = 4,
+                    LastDecisionDate = new DateOnly(2026, 1, 1)
+                },
                 new CourtAlignment("TJSP", 4, 0.75m, "acolhimento da pretensão do autor")
+                {
+                    Decisions = 4,
+                    LastDecisionDate = new DateOnly(2026, 1, 1)
+                }
             ],
             detail.CourtAlignments);
         Assert.Equal(
@@ -94,5 +103,59 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
             detail.CourtAlignments
                 .Where(alignment => alignment.CourtCode is not "STJ" and not "STF")
                 .Sum(alignment => alignment.N));
+    }
+
+    [Fact]
+    public async Task Never_adds_merit_decisions_to_the_superior_court_row()
+    {
+        await ExecuteAsync("""
+            INSERT INTO dw.dim_case (case_number, court_sk, case_class_sk, court_level, source, extracted_at)
+            SELECT 'STJ-MERIT', court.court_sk, class.case_class_sk, 'Superior', 'datajud', now()
+            FROM dw.dim_court court CROSS JOIN dw.dim_case_class class WHERE court.court_code = 'STJ';
+            INSERT INTO dw.bridge_case_subject (case_sk, subject_sk)
+            SELECT case_row.case_sk, subject.subject_sk
+            FROM dw.dim_case case_row CROSS JOIN dw.dim_subject subject WHERE case_row.case_number = 'STJ-MERIT';
+            INSERT INTO dw.fact_case_event (case_sk, court_sk, movement_sk, date_sk, occurred_at, source_url, extracted_at, natural_key)
+            SELECT case_row.case_sk, case_row.court_sk, movement.movement_sk, 20260101,
+                   TIMESTAMPTZ '2026-01-01', 'https://example.org', now(), case_row.case_number
+            FROM dw.dim_case case_row JOIN dw.dim_movement movement ON movement.movement_code = 1
+            WHERE case_row.case_number = 'STJ-MERIT';
+            REFRESH MATERIALIZED VIEW dw.case_current_result;
+            REFRESH MATERIALIZED VIEW dw.theme_summary;
+            REFRESH MATERIALIZED VIEW dw.theme_by_court;
+            """);
+
+        var detail = await _reader.GetThemeAsync(1, CancellationToken.None);
+
+        var superior = Assert.Single(detail!.CourtAlignments, alignment => alignment.CourtCode == "STJ");
+        Assert.Equal(4, superior.N);
+        Assert.Equal(0.5m, superior.Percentage);
+        Assert.Equal("provimento do recurso (pretensão do recorrente)", superior.PolarityLabel);
+    }
+
+    [Fact]
+    public async Task Shows_no_percentage_for_a_superior_court_below_the_minimum()
+    {
+        await ExecuteAsync("""
+            UPDATE dw.strength_config SET min_judged_for_percentage = 5;
+            """);
+
+        var detail = await _reader.GetThemeAsync(1, CancellationToken.None);
+
+        var superior = Assert.Single(detail!.CourtAlignments, alignment => alignment.CourtCode == "STJ");
+        Assert.Equal(4, superior.N);
+        Assert.Null(superior.Percentage);
+    }
+
+    [Fact]
+    public async Task Keeps_the_alignment_when_the_activity_was_never_refreshed()
+    {
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_court_activity WITH NO DATA");
+
+        var detail = await _reader.GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal(2, detail.CourtAlignments.Count);
+        Assert.All(detail.CourtAlignments, alignment => Assert.Null(alignment.LastDecisionDate));
     }
 }
