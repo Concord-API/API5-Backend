@@ -94,4 +94,22 @@ public class ThemePanelsControllerTests(PostgresFixture postgres) : IClassFixtur
         Assert.Equal(1m, panel.GetProperty("percentage").GetDecimal());
         Assert.Equal(46.2m, panel.GetProperty("distanceInPoints").GetDecimal());
     }
+
+    [Fact]
+    public async Task Flags_only_the_panels_twenty_points_away_from_five_judged_appeals_up()
+    {
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/1/panels");
+
+        var rule = body.GetProperty("rule");
+        Assert.Equal(20, rule.GetProperty("divergencePoints").GetInt32());
+        Assert.Equal(5, rule.GetProperty("minJudgedForDivergence").GetInt32());
+        var court = Assert.Single(body.GetProperty("courts").EnumerateArray());
+        Assert.True(Panel(court, "3ª Câmara de Direito Privado").GetProperty("divergent").GetBoolean());
+        Assert.Equal(-53.8m, Panel(court, "5ª Câmara de Direito Privado").GetProperty("distanceInPoints").GetDecimal());
+        Assert.True(Panel(court, "5ª Câmara de Direito Privado").GetProperty("divergent").GetBoolean());
+        Assert.Equal(-3.8m, Panel(court, "8ª Câmara de Direito Privado").GetProperty("distanceInPoints").GetDecimal());
+        Assert.False(Panel(court, "8ª Câmara de Direito Privado").GetProperty("divergent").GetBoolean());
+        Assert.Equal(46.2m, Panel(court, "12ª Câmara de Direito Privado").GetProperty("distanceInPoints").GetDecimal());
+        Assert.False(Panel(court, "12ª Câmara de Direito Privado").GetProperty("divergent").GetBoolean());
+    }
 }
