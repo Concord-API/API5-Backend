@@ -93,6 +93,29 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
     }
 
     [Fact]
+    public async Task Withholds_the_grade_but_keeps_the_score_below_the_minimum_judged_cases()
+    {
+        await ExecuteAsync("UPDATE dw.strength_config SET min_judged_for_grade = 145");
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Null(detail.Level);
+        Assert.Equal(78, detail.StrengthScore);
+    }
+
+    [Fact]
+    public async Task Returns_the_grade_from_exactly_the_minimum_judged_cases()
+    {
+        await ExecuteAsync("UPDATE dw.strength_config SET min_judged_for_grade = 144");
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal("Dominante", detail.Level);
+    }
+
+    [Fact]
     public async Task Returns_a_null_summary_when_the_theme_has_no_narrative()
     {
         var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
