@@ -30,7 +30,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "theme_narrative"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "data_provenance", "theme_by_court", "theme_outcome_distribution", "theme_strength", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "data_provenance", "theme_by_court", "theme_by_judging_body", "theme_outcome_distribution", "theme_strength", "theme_summary"];
 
     private static readonly string[] Scripts =
     [
@@ -50,6 +50,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V013__theme_provenance.sql",
         "V015__allow_superior_court_level.sql",
         "V016__add_strength_settings.sql",
+        "V017__theme_by_judging_body.sql",
         "V018__theme_by_court.sql"
     ];
 
