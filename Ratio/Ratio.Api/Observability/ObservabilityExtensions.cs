@@ -12,7 +12,8 @@ public static class ObservabilityExtensions
     [
         "Microsoft.AspNetCore.Hosting",
         "Microsoft.AspNetCore.Server.Kestrel",
-        "System.Runtime"
+        "System.Runtime",
+        WarehouseMetrics.MeterName
     ];
 
     public static Uri? ReadOtlpEndpoint(this IConfiguration configuration)
@@ -36,6 +37,8 @@ public static class ObservabilityExtensions
             return services;
         }
 
+        services.AddSingleton<WarehouseMetrics>();
+        services.AddHostedService<WarehouseMetricsService>();
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(ServiceName))
             .WithMetrics(metrics => metrics
