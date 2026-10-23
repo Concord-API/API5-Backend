@@ -39,4 +39,22 @@ public class ThemesControllerTests(PostgresFixture postgres) : IClassFixture<Pos
         Assert.Equal(JsonValueKind.Number, theme.GetProperty("strengthScore").ValueKind);
         Assert.Equal(JsonValueKind.String, theme.GetProperty("level").ValueKind);
     }
+
+    [Fact]
+    public async Task Describes_the_loaded_cases_and_the_declared_scope_with_the_search()
+    {
+        var response = await _client.GetAsync("/api/themes?q=cobranca%20de%20divida");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        var provenance = body.GetProperty("provenance");
+        var source = Assert.Single(provenance.GetProperty("sources").EnumerateArray());
+        Assert.Equal("datajud", source.GetProperty("source").GetString());
+        Assert.Equal("DataJud/CNJ", source.GetProperty("name").GetString());
+        Assert.Equal("2026-10-01T12:00:00+00:00", source.GetProperty("extractedAt").GetString());
+        Assert.Equal(76, source.GetProperty("count").GetInt64());
+        Assert.Equal("1.0", provenance.GetProperty("methodologyVersion").GetString());
+        var scope = body.GetProperty("scope");
+        Assert.Equal("TJMG, TJRJ e TJSP", scope.GetProperty("statement").GetString());
+        Assert.Equal("cível", scope.GetProperty("subject").GetString());
+    }
 }
