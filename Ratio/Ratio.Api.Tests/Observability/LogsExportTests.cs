@@ -72,4 +72,17 @@ public class LogsExportTests
         var log = Assert.Single(processor.Logs, IsPublishedLoad);
         Assert.Equal("datajud", log.Attributes["Source"]);
     }
+
+    [Fact]
+    public void Exports_the_api_logs_with_their_formatted_message()
+    {
+        using var processor = new CapturingProcessor();
+        using var factory = new ApiFactory();
+        using var configured = Exporting(factory, processor, "http://127.0.0.1:4317");
+
+        LogPublishedLoad(configured);
+
+        var log = Assert.Single(processor.Logs, IsPublishedLoad);
+        Assert.Contains("datajud", log.Message);
+    }
 }
