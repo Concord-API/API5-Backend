@@ -32,6 +32,7 @@ public static class ObservabilityExtensions
 
     public static IServiceCollection AddRatioObservability(this IServiceCollection services, Uri? otlpEndpoint)
     {
+        services.AddSingleton<SearchMetrics>();
         if (otlpEndpoint is null)
         {
             return services;
