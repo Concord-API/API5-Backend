@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Moq;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using Ratio.Application.Abstractions;
 
@@ -27,7 +29,8 @@ public class TelemetryContractTests
         { "ratio.search.empty_results", "", MetricType.LongSum, [], true }
     };
 
-    private static WebApplicationFactory<Program> Configured(ApiFactory factory, List<MetricSnapshot> exported)
+    private static WebApplicationFactory<Program> Configured(
+        ApiFactory factory, List<MetricSnapshot> exported, CapturingLogProcessor? logs = null)
     {
         factory.LastExtractionReader
             .Setup(reader => reader.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
@@ -39,7 +42,30 @@ public class TelemetryContractTests
         return factory.WithWebHostBuilder(builder => builder
             .UseSetting("OpenTelemetry:Endpoint", Endpoint)
             .ConfigureTestServices(services =>
-                services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(exported))));
+            {
+                services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(exported));
+                if (logs is not null)
+                {
+                    services.ConfigureOpenTelemetryLoggerProvider(logging => logging.AddProcessor(logs));
+                }
+            }));
+    }
+
+    private static async Task<ExportedLog?> WaitForAsync(CapturingLogProcessor logs, Func<ExportedLog, bool> match)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            var found = logs.Logs.FirstOrDefault(match);
+            if (found is not null)
+            {
+                return found;
+            }
+
+            await Task.Delay(20);
+        }
+
+        return null;
     }
 
     private static async Task<List<MetricSnapshot>> ExportAfterUsingTheApi()
@@ -100,5 +126,65 @@ public class TelemetryContractTests
         var resource = configured.Services.GetRequiredService<MeterProvider>().GetResource();
 
         Assert.Contains(resource.Attributes, attribute => attribute is { Key: "service.name", Value: "ratio-api" });
+    }
+
+    [Fact]
+    public void Exports_the_logs_as_the_ratio_api_service()
+    {
+        using var logs = new CapturingLogProcessor();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], logs);
+
+        var resource = configured.Services.GetRequiredService<LoggerProvider>().GetResource();
+
+        Assert.Contains(resource.Attributes, attribute => attribute is { Key: "service.name", Value: "ratio-api" });
+    }
+
+    [Fact]
+    public void Exports_each_log_with_its_level_category_formatted_message_and_properties()
+    {
+        using var logs = new CapturingLogProcessor();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], logs);
+
+        configured.Services.GetRequiredService<ILogger<TelemetryContractTests>>()
+            .LogWarning("Carga {Source} atrasada", "datajud");
+
+        var log = Assert.Single(logs.Logs, entry => entry.Category == typeof(TelemetryContractTests).FullName);
+        Assert.Equal(LogLevel.Warning, log.Level);
+        Assert.Contains("datajud", log.Message);
+        Assert.Contains("atrasada", log.Message);
+        Assert.Equal("datajud", log.Attributes["Source"]);
+    }
+
+    [Fact]
+    public async Task Keeps_the_search_text_out_of_the_metrics_and_logs()
+    {
+        var exported = new List<MetricSnapshot>();
+        using var logs = new CapturingLogProcessor();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, exported, logs);
+
+        await configured.CreateClient().GetAsync($"/api/themes?q={SearchedText}");
+        var requestLog = await WaitForAsync(logs, log =>
+            log.Attributes.TryGetValue("RequestPath", out var path) && Equals(path, "/api/themes"));
+        configured.Services.GetRequiredService<MeterProvider>().ForceFlush();
+
+        Assert.NotNull(requestLog);
+        var metricTags = exported.SelectMany(metric => metric.MetricPoints).SelectMany(point =>
+        {
+            var tags = new List<KeyValuePair<string, object?>>();
+            foreach (var tag in point.Tags)
+            {
+                tags.Add(tag);
+            }
+
+            return tags;
+        }).ToList();
+        Assert.DoesNotContain(metricTags, tag => tag.Key == "url.query");
+        Assert.DoesNotContain(metricTags, tag => tag.Value?.ToString()?.Contains(SearchedText) == true);
+        Assert.DoesNotContain(logs.Logs, log =>
+            log.Message?.Contains(SearchedText) == true
+            || log.Attributes.Values.Any(value => value?.ToString()?.Contains(SearchedText) == true));
     }
 }
