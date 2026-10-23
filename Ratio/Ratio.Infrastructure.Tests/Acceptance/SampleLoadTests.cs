@@ -63,4 +63,42 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
 
         Assert.True(results.Count >= 2);
     }
+
+    [Fact]
+    public async Task Reads_theme_alignment_by_court_after_sample_load()
+    {
+        await LoadSampleAsync();
+
+        var detail = await new ThemeDetailReader(_dataSource, NullLogger<ThemeDetailReader>.Instance)
+            .GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Contains(detail.CourtAlignments, alignment => alignment.CourtCode == "TJSP");
+    }
+
+    [Fact]
+    public async Task Reads_the_panels_of_a_loaded_theme()
+    {
+        await LoadSampleAsync();
+
+        var counts = await new PanelAlignmentReader(_dataSource).GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(counts);
+    }
+
+    [Fact]
+    public async Task Reads_the_last_decision_per_court_after_sample_load()
+    {
+        await LoadSampleAsync();
+
+        var detail = await new ThemeDetailReader(_dataSource, NullLogger<ThemeDetailReader>.Instance)
+            .GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.All(detail.CourtAlignments, alignment =>
+        {
+            Assert.True(alignment.Decisions > 0);
+            Assert.NotNull(alignment.LastDecisionDate);
+        });
+    }
 }

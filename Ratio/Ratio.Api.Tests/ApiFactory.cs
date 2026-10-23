@@ -24,6 +24,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public Mock<ICourtLevelReader> CourtLevelReader { get; } = new();
 
+    public Mock<IPanelAlignmentReader> PanelAlignmentReader { get; } = new();
+
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
     public static LoadedProvenance LoadedCases { get; } = new(
@@ -71,6 +73,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(ScopeReader.Object);
             services.AddSingleton(CourtCaseCountReader.Object);
             services.AddSingleton(CourtLevelReader.Object);
+            services.AddSingleton(PanelAlignmentReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });

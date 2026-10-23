@@ -39,6 +39,32 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         ORDER BY d.polarity_reference
         """;
 
+    private const string CourtAlignmentSql = """
+        SELECT c.court_code AS CourtCode,
+               CASE WHEN c.court_code IN ('STJ', 'STF') THEN tbc.appeal_upheld_count + tbc.appeal_rejected_count
+                    ELSE tbc.claim_upheld_count + tbc.claim_rejected_count END AS N,
+               CASE WHEN c.court_code IN ('STJ', 'STF') THEN tbc.appeal_upheld_count
+                    ELSE tbc.claim_upheld_count END AS Upheld,
+               CASE WHEN c.court_code IN ('STJ', 'STF')
+                    THEN 'provimento do recurso (pretensão do recorrente)'
+                    ELSE s.claim_polarity_label END AS PolarityLabel,
+               cfg.min_judged_for_percentage AS MinJudgedForPercentage
+        FROM dw.theme_by_court tbc
+        JOIN dw.dim_theme t ON t.theme_sk = tbc.theme_sk
+        JOIN dw.dim_court c ON c.court_code = tbc.court_code
+        JOIN dw.theme_summary s ON s.theme_sk = tbc.theme_sk
+        LEFT JOIN dw.strength_config cfg ON cfg.id = 1
+        WHERE t.theme_key = @themeKey
+        ORDER BY c.court_code
+        """;
+
+    private const string CourtActivitySql = """
+        SELECT a.court_code AS CourtCode, a.decision_count AS Decisions, a.last_decision_date AS LastDecisionDate
+        FROM dw.theme_court_activity a
+        JOIN dw.dim_theme t ON t.theme_sk = a.theme_sk
+        WHERE t.theme_key = @themeKey
+        """;
+
     public async Task<ThemeDetail?> GetThemeAsync(long themeKey, CancellationToken cancellationToken)
     {
         try
@@ -55,7 +81,25 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             var breakdown = await connection.QueryAsync<BreakdownRow>(
                 new CommandDefinition(BreakdownSql, new { themeKey }, cancellationToken: cancellationToken));
 
-            return Map(row) with { OutcomeBreakdown = breakdown.Select(MapBreakdown).ToArray() };
+            IReadOnlyList<CourtAlignmentRow> courtAlignments;
+            try
+            {
+                courtAlignments = (await connection.QueryAsync<CourtAlignmentRow>(
+                    new CommandDefinition(CourtAlignmentSql, new { themeKey }, cancellationToken: cancellationToken)))
+                    .AsList();
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+            {
+                courtAlignments = [];
+            }
+
+            var activity = await ReadCourtActivityAsync(connection, themeKey, cancellationToken);
+
+            return Map(row) with
+            {
+                OutcomeBreakdown = breakdown.Select(MapBreakdown).ToArray(),
+                CourtAlignments = courtAlignments.Select(alignment => WithActivity(MapCourtAlignment(alignment), activity)).ToArray()
+            };
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
         {
@@ -106,6 +150,36 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             ]);
     }
 
+    private static async Task<Dictionary<string, CourtActivityRow>> ReadCourtActivityAsync(
+        NpgsqlConnection connection, long themeKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var rows = await connection.QueryAsync<CourtActivityRow>(
+                new CommandDefinition(CourtActivitySql, new { themeKey }, cancellationToken: cancellationToken));
+
+            return rows.ToDictionary(row => row.CourtCode);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+        {
+            return [];
+        }
+    }
+
+    private static CourtAlignment WithActivity(CourtAlignment alignment, Dictionary<string, CourtActivityRow> activity) =>
+        activity.TryGetValue(alignment.CourtCode, out var row)
+            ? alignment with { Decisions = row.Decisions, LastDecisionDate = ToDateOnly(row.LastDecisionDate) }
+            : alignment;
+
+    private static CourtAlignment MapCourtAlignment(CourtAlignmentRow row) =>
+        new(
+            row.CourtCode,
+            row.N,
+            row.MinJudgedForPercentage is not null && row.N >= row.MinJudgedForPercentage
+                ? Math.Round((decimal)row.Upheld / row.N, 4)
+                : null,
+            row.PolarityLabel);
+
     private static DateOnly? ToDateOnly(DateTime? value) =>
         value is null ? null : DateOnly.FromDateTime(value.Value);
 
@@ -134,4 +208,14 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         long PartiallyUpheld,
         long Rejected,
         short? MinJudgedForPercentage);
+
+    private sealed record CourtActivityRow(string CourtCode, long Decisions, DateTime? LastDecisionDate);
+
+    private sealed record CourtAlignmentRow(
+        string CourtCode,
+        long N,
+        long Upheld,
+        string PolarityLabel,
+        short? MinJudgedForPercentage);
+
 }
