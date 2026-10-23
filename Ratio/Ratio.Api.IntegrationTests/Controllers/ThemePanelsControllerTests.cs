@@ -131,4 +131,14 @@ public class ThemePanelsControllerTests(PostgresFixture postgres) : IClassFixtur
             names);
         Assert.Equal(4, court.GetProperty("outsidePanels").GetInt64());
     }
+
+    [Fact]
+    public async Task Answers_not_found_for_an_unknown_theme_key()
+    {
+        var response = await _client.GetAsync("/api/themes/999999/panels");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("Tema não encontrado.", body.GetProperty("detail").GetString());
+    }
 }
