@@ -21,4 +21,17 @@ public class HealthControllerTests(PostgresFixture postgres) : IClassFixture<Pos
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("sem carga publicada", body.GetProperty("reason").GetString());
     }
+
+    [Fact]
+    public async Task Reports_ready_after_the_sample_load()
+    {
+        var client = _api.CreateClient();
+        await _api.LoadSampleAsync();
+
+        var response = await client.GetAsync("/health/ready");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Pronto", body.GetProperty("status").GetString());
+    }
 }
