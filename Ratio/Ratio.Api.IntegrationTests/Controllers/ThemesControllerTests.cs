@@ -68,4 +68,25 @@ public class ThemesControllerTests(PostgresFixture postgres) : IClassFixture<Pos
         Assert.Equal(3, body.GetProperty("total").GetInt32());
         Assert.Equal(new long[] { 1, 2, 3 }, body.GetProperty("themes").EnumerateArray().Select(theme => theme.GetProperty("themeKey").GetInt64()));
     }
+
+    [Fact]
+    public async Task Returns_the_detail_of_the_theme_found_by_search()
+    {
+        var response = await _client.GetAsync("/api/themes/1");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Cobrança de dívida", body.GetProperty("name").GetString());
+        Assert.Equal(40, body.GetProperty("caseCount").GetInt64());
+        Assert.Equal(40, body.GetProperty("judgedCount").GetInt64());
+        Assert.Equal(2, body.GetProperty("courtCount").GetInt64());
+        Assert.Equal(2023, body.GetProperty("periodStartYear").GetInt32());
+        Assert.Equal(2025, body.GetProperty("periodEndYear").GetInt32());
+        Assert.Equal("2025-09-02", body.GetProperty("lastDecisionDate").GetString());
+        Assert.Equal(
+            "Nas decisões julgadas, houve acolhimento da pretensão do autor.",
+            body.GetProperty("summary").GetProperty("lead")[0].GetProperty("text").GetString());
+        var source = Assert.Single(body.GetProperty("provenance").GetProperty("sources").EnumerateArray());
+        Assert.Equal(40, source.GetProperty("count").GetInt64());
+    }
 }
