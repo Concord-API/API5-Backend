@@ -65,6 +65,18 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reads_theme_alignment_by_court_after_sample_load()
+    {
+        await LoadSampleAsync();
+
+        var detail = await new ThemeDetailReader(_dataSource, NullLogger<ThemeDetailReader>.Instance)
+            .GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Contains(detail.CourtAlignments, alignment => alignment.CourtCode == "TJSP");
+    }
+
+    [Fact]
     public async Task Reads_the_panels_of_a_loaded_theme()
     {
         await LoadSampleAsync();
