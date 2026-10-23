@@ -63,4 +63,14 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
 
         Assert.True(results.Count >= 2);
     }
+
+    [Fact]
+    public async Task Reads_the_panels_of_a_loaded_theme()
+    {
+        await LoadSampleAsync();
+
+        var counts = await new PanelAlignmentReader(_dataSource).GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(counts);
+    }
 }
