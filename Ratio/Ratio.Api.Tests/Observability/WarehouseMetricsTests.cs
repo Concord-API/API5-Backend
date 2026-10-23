@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -116,5 +117,25 @@ public class WarehouseMetricsTests
         var exported = ExportAfterStartup(factory, Extraction(availability), "http://127.0.0.1:4317");
 
         Assert.Empty(Age(exported));
+    }
+
+    [Fact]
+    public async Task Keeps_the_api_running_and_reports_the_warehouse_unavailable_when_the_read_fails()
+    {
+        var exported = new List<MetricSnapshot>();
+        using var factory = new ApiFactory();
+        factory.LastExtractionReader
+            .Setup(reader => reader.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("falha inesperada"));
+        using var configured = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("OpenTelemetry:Endpoint", "http://127.0.0.1:4317")
+            .ConfigureTestServices(services =>
+                services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(exported))));
+
+        var response = await configured.CreateClient().GetAsync("/health");
+        configured.Services.GetRequiredService<MeterProvider>().ForceFlush();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, Availability(exported)["unavailable"]);
     }
 }
