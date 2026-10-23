@@ -1,3 +1,4 @@
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 
@@ -39,7 +40,8 @@ public static class ObservabilityExtensions
             .ConfigureResource(resource => resource.AddService(ServiceName))
             .WithMetrics(metrics => metrics
                 .AddMeter(Meters)
-                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint));
+                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
+            .WithLogging(logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint));
         return services;
     }
 }

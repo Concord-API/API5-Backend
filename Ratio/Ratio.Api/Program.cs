@@ -39,7 +39,7 @@ using (var startupLogger = new LoggerConfiguration().ReadFrom.Configuration(buil
 builder.Host.UseWindowsService();
 builder.Host.UseSerilog((context, logger) => logger
     .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext());
+    .Enrich.FromLogContext(), writeToProviders: true);
 
 builder.Services.AddControllers(options =>
 {
