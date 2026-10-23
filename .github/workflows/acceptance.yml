@@ -178,6 +178,12 @@ jobs:
           $theme = Invoke-RestMethod http://127.0.0.1:8080/api/themes/1
           Write-Output "Theme 1 is $($theme.name)"
           if (-not $theme.name) { exit 1 }
+          $court = $theme.courtAlignments | Select-Object -First 1
+          Write-Output "Court $($court.courtCode) has $($court.decisions) decision(s), the last on $($court.lastDecisionDate)"
+          if (-not $court.lastDecisionDate) { exit 1 }
+          $panels = Invoke-RestMethod http://127.0.0.1:8080/api/themes/1/panels
+          Write-Output "Theme 1 has panels in $($panels.courts.Count) court(s)"
+          if ($panels.themeKey -ne 1) { exit 1 }
 
       - name: Check the API responses against the frontend contract
         working-directory: frontend/ratio/apps/web
