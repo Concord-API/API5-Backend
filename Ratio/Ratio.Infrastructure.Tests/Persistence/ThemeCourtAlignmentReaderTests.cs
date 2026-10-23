@@ -89,5 +89,10 @@ public class ThemeCourtAlignmentReaderTests(PostgresFixture postgres) : IClassFi
                 new CourtAlignment("TJSP", 4, 0.75m, "acolhimento da pretensão do autor")
             ],
             detail.CourtAlignments);
+        Assert.Equal(
+            detail.JudgedCount,
+            detail.CourtAlignments
+                .Where(alignment => alignment.CourtCode is not "STJ" and not "STF")
+                .Sum(alignment => alignment.N));
     }
 }
