@@ -75,4 +75,14 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
         Assert.NotNull(detail);
         Assert.Contains(detail.CourtAlignments, alignment => alignment.CourtCode == "TJSP");
     }
+
+    [Fact]
+    public async Task Reads_the_panels_of_a_loaded_theme()
+    {
+        await LoadSampleAsync();
+
+        var counts = await new PanelAlignmentReader(_dataSource).GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(counts);
+    }
 }

@@ -178,6 +178,17 @@ jobs:
           $theme = Invoke-RestMethod http://127.0.0.1:8080/api/themes/1
           Write-Output "Theme 1 is $($theme.name)"
           if (-not $theme.name) { exit 1 }
+          $panels = Invoke-RestMethod http://127.0.0.1:8080/api/themes/1/panels
+          Write-Output "Theme 1 has panels in $($panels.courts.Count) court(s)"
+          if ($panels.themeKey -ne 1) { exit 1 }
+
+      - name: Check the API responses against the frontend contract
+        working-directory: frontend/ratio/apps/web
+        env:
+          CONTRACT_API_URL: http://127.0.0.1:8080
+        run: |
+          npm run test:contract
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Collect the logs
         if: ${{ failure() }}
