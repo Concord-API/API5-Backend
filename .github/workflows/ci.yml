@@ -40,7 +40,7 @@ jobs:
       - name: Build Release
         run: dotnet build Ratio.slnx --configuration Release --no-restore
       - name: Run application tests
-        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --filter "FullyQualifiedName!~Ratio.Infrastructure.Tests" --logger trx --collect:"XPlat Code Coverage" --results-directory ../TestResults
+        run: dotnet test Ratio.slnx --configuration Release --no-build --no-restore --settings coverage.runsettings --filter "FullyQualifiedName!~Ratio.Infrastructure.Tests&FullyQualifiedName!~Ratio.Api.IntegrationTests" --logger trx --collect:"XPlat Code Coverage" --results-directory ../TestResults
       - name: Publish self-contained Windows API
         run: dotnet publish Ratio.Api/Ratio.Api.csproj --configuration Release --runtime win-x64 --self-contained true -p:RestoreLockedMode=true --output ../artifacts/api
       - name: Upload test results and coverage
@@ -79,6 +79,8 @@ jobs:
         run: dotnet build Ratio.slnx --configuration Release --no-restore
       - name: Run database tests with disposable PostgreSQL
         run: dotnet test Ratio.Infrastructure.Tests/Ratio.Infrastructure.Tests.csproj --configuration Release --no-build --no-restore --settings coverage.runsettings --logger trx --collect:"XPlat Code Coverage" --results-directory ../DatabaseTestResults
+      - name: Run API integration tests with disposable PostgreSQL
+        run: dotnet test Ratio.Api.IntegrationTests/Ratio.Api.IntegrationTests.csproj --configuration Release --no-build --no-restore --settings coverage.runsettings --logger trx --collect:"XPlat Code Coverage" --results-directory ../DatabaseTestResults
       - name: Upload database test results and coverage
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
