@@ -16,6 +16,7 @@ if (WindowsServiceHelpers.IsWindowsService())
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
 
 string connectionString;
 string[] allowedOrigins;
