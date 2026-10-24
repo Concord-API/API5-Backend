@@ -222,6 +222,46 @@ public class ThemeStrengthTests(PostgresFixture postgres) : IClassFixture<Postgr
         Assert.Equal(1, strength.Courts);
     }
 
+    [Theory]
+    [InlineData(0.90, 90, "Consolidada")]
+    [InlineData(0.89, 89, "Dominante")]
+    [InlineData(0.75, 75, "Dominante")]
+    [InlineData(0.74, 74, "Em formação")]
+    [InlineData(0.55, 55, "Em formação")]
+    [InlineData(0.54, 54, "Divergente")]
+    public async Task Grades_each_side_of_the_band_boundaries(double agreementWeight, int expectedScore, string expectedLevel)
+    {
+        await using (var connection = _dataSource.CreateConnection())
+        {
+            await connection.ExecuteAsync(
+                "INSERT INTO dw.strength_config (methodology_version, reference_year, weight_agreement, weight_volume, weight_coverage, weight_recency) " +
+                "VALUES ('1.0', 2026, @Agreement::real, 0, 0, 1 - @Agreement::real)",
+                new { Agreement = agreementWeight });
+        }
+        await ExecuteAsync(Outcomes +
+            "INSERT INTO dw.dim_court (court_code, court_name, state_uf) VALUES ('TJSP', 'Tribunal de Justiça de São Paulo', 'SP'); " +
+            "INSERT INTO dw.dim_case_class (class_name, claimant_type) VALUES ('Ação de Cobrança', 'autor_particular'); " +
+            "INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day) VALUES (20150615, '2015-06-15', 2015, 2, 6, 'Junho', 15); " +
+            "INSERT INTO dw.dim_theme (theme_name, theme_key) VALUES ('Tema da faixa', 7); " +
+            "INSERT INTO dw.dim_subject (subject_name, subject_code) VALUES ('Assunto da faixa', 107); " +
+            "INSERT INTO dw.bridge_theme_subject (theme_sk, subject_sk) SELECT theme_sk, subject_sk FROM dw.dim_theme, dw.dim_subject; " +
+            "INSERT INTO dw.dim_case (case_number, court_sk, case_class_sk, court_level, source, extracted_at) " +
+            "SELECT 'BAND-' || n, c.court_sk, cc.case_class_sk, 'First', 'datajud', now() " +
+            "FROM generate_series(1, 20) n CROSS JOIN dw.dim_court c CROSS JOIN dw.dim_case_class cc; " +
+            "INSERT INTO dw.bridge_case_subject (case_sk, subject_sk) SELECT dc.case_sk, s.subject_sk FROM dw.dim_case dc CROSS JOIN dw.dim_subject s; " +
+            "INSERT INTO dw.fact_case_event (case_sk, court_sk, movement_sk, date_sk, occurred_at, source_url, extracted_at, natural_key) " +
+            "SELECT dc.case_sk, dc.court_sk, m.movement_sk, 20150615, TIMESTAMPTZ '2015-06-15', 'https://example.org', now(), 'band:' || dc.case_sk " +
+            "FROM dw.dim_case dc CROSS JOIN dw.dim_movement m WHERE m.movement_code = 219;");
+
+        await RefreshAggregatesAsync();
+        var strength = await ReadStrengthAsync(7);
+
+        Assert.Equal(1m, strength.AgreementValue);
+        Assert.Equal(0m, strength.RecencyValue);
+        Assert.Equal(expectedScore, strength.Score);
+        Assert.Equal(expectedLevel, strength.Level);
+    }
+
     [Fact]
     public async Task Scores_a_theme_without_judgments_as_zero_instead_of_dividing_by_zero()
     {
