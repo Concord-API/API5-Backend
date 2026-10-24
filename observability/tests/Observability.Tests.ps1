@@ -124,6 +124,40 @@ Describe 'custom.ini' {
     }
 }
 
+Describe 'fontes de dados do Grafana' {
+    BeforeAll {
+        $path = Join-Path $PSScriptRoot '..' 'grafana' 'provisioning' 'datasources' 'ratio.yaml'
+        $sources = @{}
+        if (Test-Path -Path $path) {
+            $blocks = (Get-Content -Path $path -Raw) -split '(?m)^\s*-\s+name:\s*'
+            foreach ($block in $blocks | Select-Object -Skip 1) {
+                $entry = @{}
+                foreach ($match in [regex]::Matches($block, '(?m)^\s*(\w+):\s*(\S+)\s*$')) {
+                    $entry[$match.Groups[1].Value] = $match.Groups[2].Value
+                }
+                $sources[($block -split '\r?\n')[0].Trim()] = $entry
+            }
+        }
+    }
+
+    It 'provisiona o Prometheus como fonte padrão em 127.0.0.1:9090' {
+        $sources['Prometheus'].type | Should -Be 'prometheus'
+        $sources['Prometheus'].uid | Should -Be 'prometheus'
+        $sources['Prometheus'].url | Should -Be 'http://127.0.0.1:9090'
+        $sources['Prometheus'].isDefault | Should -Be 'true'
+    }
+
+    It 'provisiona o Loki em 127.0.0.1:3100' {
+        $sources['Loki'].type | Should -Be 'loki'
+        $sources['Loki'].uid | Should -Be 'loki'
+        $sources['Loki'].url | Should -Be 'http://127.0.0.1:3100'
+    }
+
+    It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }) {
+        $sources[$Name].editable | Should -Be 'false'
+    }
+}
+
 Describe 'Assert-GrafanaAdminPassword' {
     BeforeAll {
         function ConvertTo-Secret([string] $Value) {
