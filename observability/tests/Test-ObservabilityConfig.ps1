@@ -61,7 +61,9 @@ try {
         throw "Não foi possível extrair o Alloy do instalador (7z terminou com $LASTEXITCODE)."
     }
 
+    Get-ChildItem -Path (Join-Path $work 'alloy') -Recurse -File | ForEach-Object { Write-Host "  $($_.FullName.Substring($work.Length)) ($($_.Length) bytes)" }
     $alloy = Find-Executable -Path (Join-Path $work 'alloy') -Filter 'alloy*.exe'
+    Invoke-ConfigCheck -Name 'Alloy (versão)' -FilePath $alloy -ArgumentList '--version'
     Invoke-ConfigCheck -Name 'Alloy' -FilePath $alloy -ArgumentList 'validate', (Join-Path $observability 'alloy\config.alloy')
 }
 finally {
