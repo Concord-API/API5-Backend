@@ -65,4 +65,50 @@ function Wait-ComponentReady {
     throw "$Name não ficou pronto em $TimeoutSeconds s ($Uri). Veja o log do serviço."
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady
+function Stop-ServiceIfPresent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Name
+    )
+
+    $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if ($null -ne $service -and $service.Status -ne 'Stopped') {
+        Stop-Service -Name $Name -Force
+        $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(90))
+    }
+}
+
+function Grant-LocalServiceWrite {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Path
+    )
+
+    New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    & icacls.exe $Path /grant '*S-1-5-19:(OI)(CI)M' /T /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Não foi possível dar ao Serviço Local permissão de escrita em '$Path' (icacls terminou com $LASTEXITCODE)."
+    }
+}
+
+function Register-WinSWService {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $Directory,
+        [Parameter(Mandatory)] [string] $WinSWPath
+    )
+
+    $wrapper = Join-Path $Directory "$Name.exe"
+    Copy-Item -Path $WinSWPath -Destination $wrapper -Force
+    if ($null -eq (Get-Service -Name $Name -ErrorAction SilentlyContinue)) {
+        & $wrapper install | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "O WinSW não conseguiu registrar o serviço '$Name' (código $LASTEXITCODE)."
+        }
+    }
+
+    Start-Service -Name $Name
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService
