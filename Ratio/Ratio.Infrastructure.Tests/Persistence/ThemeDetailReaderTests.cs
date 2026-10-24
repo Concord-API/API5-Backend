@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using Ratio.Application.Abstractions;
 using Ratio.Infrastructure.Migrations;
 using Ratio.Infrastructure.Persistence;
 
@@ -120,8 +121,8 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
         Assert.NotNull(detail);
         Assert.Equal(
             [
-                new YearlyAlignment(2023, 2, null, "acolhimento da pretensão do autor"),
-                new YearlyAlignment(2024, 142, null, "acolhimento da pretensão do autor")
+                new YearlyAlignment(2023, 2, 1m, "acolhimento da pretensão do autor"),
+                new YearlyAlignment(2024, 142, 0.9859m, "acolhimento da pretensão do autor")
             ],
             detail.YearlyAlignments);
     }
