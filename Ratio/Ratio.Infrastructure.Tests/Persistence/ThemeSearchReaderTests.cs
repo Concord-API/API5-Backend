@@ -195,6 +195,22 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(78, top.StrengthScore);
     }
 
+    [Theory]
+    [InlineData(9, null)]
+    [InlineData(10, "Em formação")]
+    public async Task Applies_the_default_minimum_of_ten_judged_cases_to_the_grade(int judged, string? expectedLevel)
+    {
+        await InsertThemeAsync(52, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(52, upheldCount: judged, rejectedCount: 0, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None));
+
+        Assert.Equal(judged, theme.JudgedCount);
+        Assert.NotNull(theme.StrengthScore);
+        Assert.Equal(expectedLevel, theme.Level);
+    }
+
     [Fact]
     public async Task Returns_the_grade_from_exactly_the_minimum_judged_cases()
     {
