@@ -86,5 +86,5 @@ Write-Host 'Observabilidade instalada:'
 foreach ($artifact in $manifest | Where-Object { $_.name -ne 'winsw' }) {
     Write-Host "  $($artifact.name) $($artifact.version)"
 }
-Write-Host 'Grafana em http://127.0.0.1:3000, usuário admin.'
+Write-Host 'Grafana em http://127.0.0.1:3000, usuário admin. Para trocar a senha, rode o Reset-GrafanaAdminPassword.ps1.'
 Write-Host 'Para ativar a telemetria da API, defina OpenTelemetry__Endpoint=http://127.0.0.1:4317 e reinicie o serviço da API.'
