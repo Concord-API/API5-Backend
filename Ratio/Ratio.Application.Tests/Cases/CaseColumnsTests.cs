@@ -21,4 +21,28 @@ public class CaseColumnsTests
     {
         Assert.Equal("Procedente", CaseColumns.Outcome("Granted", "Procedente", polarityReference));
     }
+
+    [Theory]
+    [InlineData("Terceira Turma")]
+    [InlineData("Segunda Seção")]
+    [InlineData("Corte Especial")]
+    public void Keeps_a_panel_a_section_or_the_Special_Court_of_the_STJ(string bodyName)
+    {
+        Assert.Equal(bodyName, CaseColumns.JudgingBody("STJ", bodyName));
+    }
+
+    [Theory]
+    [InlineData("GABINETE DO MINISTRO MARCO AURÉLIO BELLIZZE")]
+    [InlineData("Presidência")]
+    [InlineData(null)]
+    public void Leaves_the_chamber_of_the_STJ_empty_when_it_is_not_a_panel(string? bodyName)
+    {
+        Assert.Null(CaseColumns.JudgingBody("STJ", bodyName));
+    }
+
+    [Fact]
+    public void Keeps_the_chamber_of_a_state_court()
+    {
+        Assert.Equal("5ª Câmara de Direito Privado", CaseColumns.JudgingBody("TJSP", "5ª Câmara de Direito Privado"));
+    }
 }
