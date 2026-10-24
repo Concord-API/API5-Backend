@@ -31,3 +31,26 @@ otelcol.exporter.otlphttp "loki" {
     endpoint = "http://127.0.0.1:3100/otlp"
   }
 }
+
+prometheus.exporter.blackbox "api" {
+  config = "{ modules: { http_2xx: { prober: http, timeout: 5s } } }"
+
+  target {
+    name    = "live"
+    address = "http://127.0.0.1:5000/health"
+    module  = "http_2xx"
+  }
+
+  target {
+    name    = "ready"
+    address = "http://127.0.0.1:5000/health/ready"
+    module  = "http_2xx"
+  }
+}
+
+prometheus.scrape "api_health" {
+  targets         = prometheus.exporter.blackbox.api.targets
+  forward_to      = [prometheus.remote_write.local.receiver]
+  scrape_interval = "1m"
+  scrape_timeout  = "10s"
+}
