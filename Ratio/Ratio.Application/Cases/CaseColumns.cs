@@ -13,4 +13,11 @@ public static class CaseColumns
         polarityReference == "pretensao_recorrente" && AppealOutcomes.TryGetValue(outcomeCode, out var appealOutcome)
             ? appealOutcome
             : outcomeLabel;
+
+    private static readonly string[] SuperiorCourtPanels = ["Turma", "Seção", "Corte Especial"];
+
+    public static string? JudgingBody(string courtCode, string? bodyName) =>
+        courtCode != "STJ" || SuperiorCourtPanels.Any(panel => bodyName?.EndsWith(panel, StringComparison.Ordinal) == true)
+            ? bodyName
+            : null;
 }
