@@ -79,3 +79,35 @@ Describe 'artifacts.json' {
         }
     }
 }
+
+Describe 'Wait-ComponentReady' {
+    BeforeEach {
+        Mock Start-Sleep -ModuleName Observability
+    }
+
+    It 'volta assim que o componente responde' {
+        Mock Invoke-WebRequest -ModuleName Observability { [pscustomobject] @{ StatusCode = 200 } }
+
+        { Wait-ComponentReady -Name 'Prometheus' -Uri 'http://127.0.0.1:9090/-/ready' -TimeoutSeconds 30 } | Should -Not -Throw
+        Should -Invoke Invoke-WebRequest -ModuleName Observability -Times 1 -Exactly
+    }
+
+    It 'tenta de novo enquanto o componente ainda não responde' {
+        $script:attempts = 0
+        Mock Invoke-WebRequest -ModuleName Observability {
+            $script:attempts++
+            if ($script:attempts -lt 3) { throw 'Conexão recusada' }
+            [pscustomobject] @{ StatusCode = 200 }
+        }
+
+        { Wait-ComponentReady -Name 'Loki' -Uri 'http://127.0.0.1:3100/ready' -TimeoutSeconds 30 } | Should -Not -Throw
+        Should -Invoke Invoke-WebRequest -ModuleName Observability -Times 3 -Exactly
+    }
+
+    It 'desiste depois do tempo limite, citando o componente e o endereço' {
+        Mock Invoke-WebRequest -ModuleName Observability { throw 'Conexão recusada' }
+
+        { Wait-ComponentReady -Name 'Grafana' -Uri 'http://127.0.0.1:3000/api/health' -TimeoutSeconds 0 } |
+            Should -Throw '*Grafana*http://127.0.0.1:3000/api/health*'
+    }
+}
