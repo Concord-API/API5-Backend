@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Ratio.Application.Abstractions;
 
 public sealed record SampleCase(
@@ -12,7 +14,14 @@ public sealed record SampleCase(
     string? SourceLink,
     string? SourceLinkType);
 
-public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases)
+public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases, long Total)
 {
+    private static readonly CultureInfo Portuguese = CultureInfo.GetCultureInfo("pt-BR");
+
     public string Ordering => "julgamento mais recente primeiro; empate pelo número do processo";
+
+    public int Shown => Cases.Count;
+
+    public string SampleLabel =>
+        string.Format(Portuguese, "{0:N0} de {1:N0} {2}", Shown, Total, Total == 1 ? "decisão" : "decisões");
 }

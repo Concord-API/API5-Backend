@@ -148,6 +148,19 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
     }
 
     [Fact]
+    public async Task Counts_every_case_of_the_theme_beyond_the_limit()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20240320);
+        await InsertCaseAsync("CASE-2", 220, 20250910);
+        await InsertCaseAsync("CASE-3", 219, 20250615);
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 2, CancellationToken.None);
+
+        Assert.Equal(3, cases!.Total);
+    }
+
+    [Fact]
     public async Task Returns_no_cases_for_a_theme_without_judgments()
     {
         await InsertCaseAsync("CASE-1", 219, 20250615);
@@ -157,6 +170,7 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
 
         Assert.NotNull(cases);
         Assert.Empty(cases.Cases);
+        Assert.Equal(0, cases.Total);
     }
 
     [Fact]
@@ -176,5 +190,6 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
 
         Assert.NotNull(cases);
         Assert.Empty(cases.Cases);
+        Assert.Equal(0, cases.Total);
     }
 }
