@@ -126,4 +126,25 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
             ],
             detail.YearlyAlignments);
     }
+
+    [Fact]
+    public async Task Exposes_the_yearly_trend_values_from_the_oldest_and_latest_years()
+    {
+        await ExecuteAsync("""
+            INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day)
+            VALUES (20230101, '2023-01-01', 2023, 1, 1, 'Janeiro', 1);
+            UPDATE dw.fact_case_event SET date_sk = 20230101
+            WHERE case_sk IN (SELECT case_sk FROM dw.dim_case ORDER BY case_sk LIMIT 2);
+            REFRESH MATERIALIZED VIEW dw.case_current_result;
+            REFRESH MATERIALIZED VIEW dw.theme_summary;
+            REFRESH MATERIALIZED VIEW dw.theme_strength;
+            REFRESH MATERIALIZED VIEW dw.theme_by_year;
+            """);
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.Equal(
+            new YearlyTrend(1m, 0.9859m, "acolhimento da pretensão do autor"),
+            detail!.YearlyTrend);
+    }
 }
