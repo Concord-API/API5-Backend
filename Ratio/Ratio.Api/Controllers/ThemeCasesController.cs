@@ -10,7 +10,14 @@ public class ThemeCasesController(IThemeCasesReader themeCasesReader) : Controll
     [HttpGet]
     public async Task<IActionResult> Get(long key, [FromQuery] int? limit, CancellationToken cancellationToken)
     {
-        var cases = await themeCasesReader.ListCasesAsync(key, limit ?? 20, cancellationToken);
+        if (limit is < 1 or > 100)
+        {
+            return Problem(
+                detail: "O parâmetro 'limit' deve estar entre 1 e 100.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var cases =await themeCasesReader.ListCasesAsync(key, limit ?? 20, cancellationToken);
 
         if (cases is null)
         {
