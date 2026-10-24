@@ -32,6 +32,17 @@ public class UnavailableBlocksTests
     }
 
     [Fact]
+    public void Lists_the_reporter_judge_and_amount_as_the_sample_columns_without_a_source()
+    {
+        Assert.Equal(
+            [
+                Assert.Single(UnavailableBlocks.Sourceless, item => item.Block == "reporterJudge"),
+                Assert.Single(UnavailableBlocks.Sourceless, item => item.Block == "amountAwarded")
+            ],
+            UnavailableBlocks.SampleColumns);
+    }
+
+    [Fact]
     public void Never_repeats_a_message_across_blocks()
     {
         var messages = UnavailableBlocks.Sourceless.Select(item => item.Message).ToArray();
