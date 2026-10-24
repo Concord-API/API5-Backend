@@ -1,6 +1,7 @@
 using Dapper;
 using Npgsql;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Cases;
 
 namespace Ratio.Infrastructure.Persistence;
 
@@ -11,7 +12,8 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
     private const string CasesSql = """
         SELECT COALESCE(case_number_formatted, case_number) AS CaseNumber, court_code AS CourtCode,
                judging_body AS JudgingBody, case_class AS CaseClass, court_level AS CourtLevel,
-               decision_date AS DecisionDate, outcome_label AS Outcome, source AS Source,
+               decision_date AS DecisionDate, outcome_code AS OutcomeCode, outcome_label AS OutcomeLabel,
+               polarity_reference AS PolarityReference, source AS Source,
                source_link AS SourceLink, source_link_type AS SourceLinkType, secrecy_level > 0 AS Sealed
         FROM dw.theme_case_sample
         WHERE theme_key = @themeKey
@@ -57,11 +59,11 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
     private static SampleCase ToSampleCase(CaseRow row) => row.Sealed ? SampleCase.SealedCase : new(
         row.CaseNumber,
         row.CourtCode,
-        row.JudgingBody,
+        CaseColumns.JudgingBody(row.CourtCode, row.JudgingBody),
         row.CaseClass,
         row.CourtLevel,
         row.DecisionDate is null ? null : DateOnly.FromDateTime(row.DecisionDate.Value),
-        row.Outcome,
+        CaseColumns.Outcome(row.OutcomeCode, row.OutcomeLabel, row.PolarityReference),
         row.Source,
         row.SourceLink,
         row.SourceLinkType);
@@ -73,7 +75,9 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
         string? CaseClass,
         string CourtLevel,
         DateTime? DecisionDate,
-        string Outcome,
+        string OutcomeCode,
+        string OutcomeLabel,
+        string? PolarityReference,
         string Source,
         string? SourceLink,
         string? SourceLinkType,
