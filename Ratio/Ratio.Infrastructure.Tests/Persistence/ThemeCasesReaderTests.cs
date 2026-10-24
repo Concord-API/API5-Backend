@@ -135,6 +135,47 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
         Assert.Equal(["CASE-A", "CASE-B", "CASE-C"], cases!.Cases.Select(sampleCase => sampleCase.CaseNumber));
     }
 
+    private async Task InsertTiedCasesAsync()
+    {
+        await InsertCaseAsync("CASE-E", 220, 20250615);
+        await InsertCaseAsync("CASE-B", 219, 20240320);
+        await InsertCaseAsync("CASE-G", 219, 20250910, secrecyLevel: 1);
+        await InsertCaseAsync("CASE-A", 219, 20250615);
+        await InsertCaseAsync("CASE-F", 220, 20240320);
+        await InsertCaseAsync("CASE-C", 219, 20250910);
+        await InsertCaseAsync("CASE-D", 220, 20250615);
+        await RefreshAsync();
+    }
+
+    [Theory]
+    [InlineData(20)]
+    [InlineData(4)]
+    public async Task Returns_the_same_order_on_two_calls(int limit)
+    {
+        await InsertTiedCasesAsync();
+
+        var first = await _reader.ListCasesAsync(412, limit, CancellationToken.None);
+        var second = await _reader.ListCasesAsync(412, limit, CancellationToken.None);
+
+        Assert.Equal(first!.Cases, second!.Cases);
+        Assert.Equal(
+            new string?[] { "CASE-C", "CASE-A", "CASE-D", "CASE-E", "CASE-B", "CASE-F", null }.Take(limit),
+            second.Cases.Select(sampleCase => sampleCase.CaseNumber));
+    }
+
+    [Fact]
+    public async Task Keeps_the_order_after_the_current_results_are_refreshed()
+    {
+        await InsertTiedCasesAsync();
+
+        var before = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+        await ExecuteAsync("UPDATE dw.dim_case SET extracted_at = now()");
+        await RefreshAsync();
+        var after = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        Assert.Equal(before!.Cases, after!.Cases);
+    }
+
     [Fact]
     public async Task Returns_at_most_the_requested_number_of_cases()
     {
