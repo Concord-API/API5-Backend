@@ -16,6 +16,12 @@ public static class UnavailableBlocks
             "O DataJud não publica o relator.")
     ];
 
+    public static IReadOnlyList<UnavailableBlock> SampleColumns { get; } =
+    [
+        .. Sourceless.Where(item => item.Block == "reporterJudge"),
+        .. Sourceless.Where(item => item.Block == "amountAwarded")
+    ];
+
     public static IReadOnlyList<UnavailableBlock> ForTheme(long judgedCount, bool hasSummary) =>
         hasSummary ? Sourceless : [.. Sourceless, Summary(judgedCount)];
 
