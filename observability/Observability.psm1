@@ -66,13 +66,13 @@ function Wait-ComponentReady {
 }
 
 function Stop-ServiceIfPresent {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)] [string] $Name
     )
 
     $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
-    if ($null -ne $service -and $service.Status -ne 'Stopped') {
+    if ($null -ne $service -and $service.Status -ne 'Stopped' -and $PSCmdlet.ShouldProcess($Name, 'Parar o serviço')) {
         Stop-Service -Name $Name -Force
         $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(90))
     }
