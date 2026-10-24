@@ -12,7 +12,7 @@ public sealed record SampleCase(
     string? SourceLink,
     string? SourceLinkType);
 
-public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases)
+public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases, long Total)
 {
     public string Ordering => "julgamento mais recente primeiro; empate pelo número do processo";
 }

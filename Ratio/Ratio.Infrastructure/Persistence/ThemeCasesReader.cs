@@ -19,6 +19,8 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
         LIMIT @limit
         """;
 
+    private const string TotalSql = "SELECT count(*) FROM dw.theme_case_sample WHERE theme_key = @themeKey";
+
     public async Task<ThemeCases?> ListCasesAsync(long themeKey, int limit, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -30,10 +32,10 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
             return null;
         }
 
-        return new ThemeCases(themeKey, await ReadCasesAsync(connection, themeKey, limit, cancellationToken));
+        return await ReadCasesAsync(connection, themeKey, limit, cancellationToken);
     }
 
-    private static async Task<IReadOnlyList<SampleCase>> ReadCasesAsync(
+    private static async Task<ThemeCases> ReadCasesAsync(
         NpgsqlConnection connection, long themeKey, int limit, CancellationToken cancellationToken)
     {
         try
@@ -41,11 +43,14 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
             var rows = await connection.QueryAsync<CaseRow>(
                 new CommandDefinition(CasesSql, new { themeKey, limit }, cancellationToken: cancellationToken));
 
-            return rows.Select(ToSampleCase).ToArray();
+            var total = await connection.ExecuteScalarAsync<long>(
+                new CommandDefinition(TotalSql, new { themeKey }, cancellationToken: cancellationToken));
+
+            return new ThemeCases(themeKey, rows.Select(ToSampleCase).ToArray(), total);
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
         {
-            return [];
+            return new ThemeCases(themeKey, [], 0);
         }
     }
 
