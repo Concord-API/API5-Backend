@@ -149,6 +149,35 @@ Describe 'Assert-GrafanaAdminPassword' {
     }
 }
 
+Describe 'Read-GrafanaAdminPassword' {
+    It 'devolve a senha digitada duas vezes' {
+        Mock Read-Host -ModuleName Observability { ConvertTo-SecureString -String 'Ratio-Monitor-2026' -AsPlainText -Force }
+
+        $password = Read-GrafanaAdminPassword
+
+        [Net.NetworkCredential]::new('', $password).Password | Should -Be 'Ratio-Monitor-2026'
+        Should -Invoke Read-Host -ModuleName Observability -Times 2 -Exactly
+    }
+
+    It 'recusa quando a confirmação não é igual à senha' {
+        $script:answers = @('Ratio-Monitor-2026', 'Ratio-Monitor-2027')
+        $script:reads = 0
+        Mock Read-Host -ModuleName Observability {
+            $answer = $script:answers[$script:reads]
+            $script:reads++
+            ConvertTo-SecureString -String $answer -AsPlainText -Force
+        }
+
+        { Read-GrafanaAdminPassword } | Should -Throw '*não são iguais*'
+    }
+
+    It 'recusa a senha fora da política' {
+        Mock Read-Host -ModuleName Observability { ConvertTo-SecureString -String 'Ratio-2026' -AsPlainText -Force }
+
+        { Read-GrafanaAdminPassword } | Should -Throw '*12 caracteres*'
+    }
+}
+
 Describe 'Wait-ComponentReady' {
     BeforeEach {
         Mock Start-Sleep -ModuleName Observability
