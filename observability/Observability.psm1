@@ -182,6 +182,34 @@ function Assert-GrafanaAdminPassword {
     }
 }
 
+function Set-GrafanaAdminPassword {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)] [string] $GrafanaHome,
+        [Parameter(Mandatory)] [securestring] $Password
+    )
+
+    if (-not $PSCmdlet.ShouldProcess('admin', 'Trocar a senha do Grafana')) {
+        return
+    }
+
+    $startInfo = New-Object Diagnostics.ProcessStartInfo
+    $startInfo.FileName = Join-Path $GrafanaHome 'bin\grafana.exe'
+    $startInfo.Arguments = "cli --homepath `"$GrafanaHome`" admin reset-admin-password --password-from-stdin"
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = [Diagnostics.Process]::Start($startInfo)
+    $process.StandardInput.WriteLine([Net.NetworkCredential]::new('', $Password).Password)
+    $process.StandardInput.Close()
+    $output = $process.StandardOutput.ReadToEnd() + $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+        throw "Não foi possível trocar a senha do admin do Grafana (código $($process.ExitCode)): $($output.Trim())"
+    }
+}
+
 function Merge-EnvironmentEntry {
     [CmdletBinding()]
     param(
@@ -223,4 +251,4 @@ function Set-ServiceEnvironment {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
