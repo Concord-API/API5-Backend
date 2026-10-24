@@ -42,6 +42,9 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
         Assert.Equal(
             "julgamento mais recente primeiro; empate pelo número do processo",
             body.GetProperty("ordering").GetString());
+        Assert.Equal(1, body.GetProperty("shown").GetInt32());
+        Assert.Equal(12418, body.GetProperty("total").GetInt64());
+        Assert.Equal("1 de 12.418 decisões", body.GetProperty("sampleLabel").GetString());
         var sampleCase = Assert.Single(body.GetProperty("cases").EnumerateArray());
         Assert.Equal("0001234-56.2024.8.26.0100", sampleCase.GetProperty("caseNumber").GetString());
         Assert.Equal("TJSP", sampleCase.GetProperty("courtCode").GetString());
