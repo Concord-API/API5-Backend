@@ -64,6 +64,9 @@ try {
     Write-Host 'Instalando o Grafana...'
     Invoke-Installer -Name 'Grafana' -FilePath 'msiexec.exe' -ArgumentList '/i', "`"$($artifacts['grafana'])`"", '/qn', '/norestart'
     Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\custom.ini') -Destination (Join-Path $grafanaHome 'conf\custom.ini') -Force
+    $grafanaDatasources = Join-Path $grafanaHome 'conf\provisioning\datasources'
+    New-Item -ItemType Directory -Path $grafanaDatasources -Force | Out-Null
+    Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\provisioning\datasources\ratio.yaml') -Destination $grafanaDatasources -Force
     Restart-Service -Name 'Grafana'
 }
 finally {
