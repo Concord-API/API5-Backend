@@ -51,13 +51,14 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
 
     private Task RefreshAsync() => ExecuteAsync("REFRESH MATERIALIZED VIEW dw.case_current_result");
 
-    private async Task InsertCaseAsync(string caseNumber, int movementCode, int dateSk, string? formatted = null)
+    private async Task InsertCaseAsync(
+        string caseNumber, int movementCode, int dateSk, string? formatted = null, short secrecyLevel = 0)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
         await connection.ExecuteAsync(
-            "INSERT INTO dw.dim_case (case_number, court_sk, case_class_sk, court_level, source, extracted_at, " +
+            "INSERT INTO dw.dim_case (case_number, court_sk, case_class_sk, court_level, secrecy_level, source, extracted_at, " +
             "case_number_formatted, source_link, source_link_type) " +
-            "SELECT @caseNumber, c.court_sk, cc.case_class_sk, 'Second', 'datajud', now(), " +
+            "SELECT @caseNumber, c.court_sk, cc.case_class_sk, 'Second', @secrecyLevel, 'datajud', now(), " +
             "@formatted, 'https://esaj.tjsp.jus.br/' || @caseNumber, 'portal' " +
             "FROM dw.dim_court c CROSS JOIN dw.dim_case_class cc; " +
             "INSERT INTO dw.bridge_case_subject (case_sk, subject_sk) " +
@@ -69,7 +70,7 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
             "FROM dw.dim_case dc JOIN dw.dim_judging_body jb ON jb.court_sk = dc.court_sk " +
             "JOIN dw.dim_movement m ON m.movement_code = @movementCode JOIN dw.dim_date d ON d.date_sk = @dateSk " +
             "WHERE dc.case_number = @caseNumber",
-            new { caseNumber, movementCode, dateSk, formatted });
+            new { caseNumber, movementCode, dateSk, formatted, secrecyLevel });
     }
 
     [Fact]
@@ -158,6 +159,30 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
         var cases = await _reader.ListCasesAsync(412, 2, CancellationToken.None);
 
         Assert.Equal(3, cases!.Total);
+    }
+
+    [Fact]
+    public async Task Hides_every_column_of_a_sealed_case()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20250615, "0001234-56.2024.8.26.0100", secrecyLevel: 3);
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        Assert.Equal(SampleCase.SealedCase, Assert.Single(cases!.Cases));
+    }
+
+    [Fact]
+    public async Task Counts_a_sealed_case_in_the_total()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20250615);
+        await InsertCaseAsync("CASE-2", 220, 20240320, secrecyLevel: 1);
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        Assert.Equal(2, cases!.Total);
+        Assert.Equal([false, true], cases.Cases.Select(sampleCase => sampleCase.Sealed));
     }
 
     [Fact]

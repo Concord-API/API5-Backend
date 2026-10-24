@@ -56,6 +56,24 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
         Assert.Equal("datajud", sampleCase.GetProperty("source").GetString());
         Assert.Equal("https://esaj.tjsp.jus.br/cpopg/open.do", sampleCase.GetProperty("sourceLink").GetString());
         Assert.Equal("portal", sampleCase.GetProperty("sourceLinkType").GetString());
+        Assert.False(sampleCase.GetProperty("sealed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Returns_a_sealed_case_flagged_and_without_data()
+    {
+        factory.ThemeCasesReader
+            .Setup(reader => reader.ListCasesAsync(417, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ThemeCases(417, [SampleCase.SealedCase], 1));
+
+        var response = await _client.GetAsync("/api/themes/417/cases");
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var sampleCase = Assert.Single(body.GetProperty("cases").EnumerateArray());
+        Assert.True(sampleCase.GetProperty("sealed").GetBoolean());
+        Assert.All(
+            sampleCase.EnumerateObject().Where(property => property.Name != "sealed"),
+            property => Assert.Equal(JsonValueKind.Null, property.Value.ValueKind));
     }
 
     [Fact]
