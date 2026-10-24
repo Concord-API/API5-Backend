@@ -457,6 +457,25 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task Returns_the_yearly_trend_values()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(422, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with
+            {
+                ThemeKey = 422,
+                YearlyTrend = new YearlyTrend(0.69m, 0.84m, "acolhimento da pretensão do autor")
+            });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/422");
+
+        var trend = body.GetProperty("yearlyTrend");
+        Assert.Equal(0.69m, trend.GetProperty("fromPercentage").GetDecimal());
+        Assert.Equal(0.84m, trend.GetProperty("toPercentage").GetDecimal());
+        Assert.Equal("acolhimento da pretensão do autor", trend.GetProperty("polarityLabel").GetString());
+    }
+
+    [Fact]
     public async Task Returns_an_empty_outcome_breakdown_for_a_theme_without_judged_cases()
     {
         factory.ThemeDetailReader

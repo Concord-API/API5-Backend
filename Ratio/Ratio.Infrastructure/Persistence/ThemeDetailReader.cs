@@ -114,7 +114,8 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             {
                 OutcomeBreakdown = breakdown.Select(MapBreakdown).ToArray(),
                 CourtAlignments = courtAlignments.Select(alignment => WithActivity(MapCourtAlignment(alignment), activity)).ToArray(),
-                YearlyAlignments = yearlyAlignments.Select(MapYearlyAlignment).ToArray()
+                YearlyAlignments = yearlyAlignments.Select(MapYearlyAlignment).ToArray(),
+                YearlyTrend = MapYearlyTrend(yearlyAlignments)
             };
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
@@ -204,6 +205,21 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
                 ? Math.Round((decimal)row.Upheld / row.N, 4)
                 : null,
             row.PolarityLabel);
+
+    private static YearlyTrend? MapYearlyTrend(IReadOnlyList<YearlyAlignmentRow> rows)
+    {
+        if (rows.Count < 2)
+        {
+            return null;
+        }
+
+        var first = MapYearlyAlignment(rows[0]);
+        var last = MapYearlyAlignment(rows[^1]);
+
+        return first.Percentage is null || last.Percentage is null
+            ? null
+            : new YearlyTrend(first.Percentage.Value, last.Percentage.Value, first.PolarityLabel);
+    }
 
     private static async Task<IReadOnlyList<YearlyAlignmentRow>> ReadYearlyAlignmentsAsync(
         NpgsqlConnection connection, long themeKey, CancellationToken cancellationToken)
