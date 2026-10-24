@@ -163,6 +163,25 @@ function Get-RandomPassword {
     $password.ToString()
 }
 
+function Assert-GrafanaAdminPassword {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [securestring] $Password
+    )
+
+    $plain = [Net.NetworkCredential]::new('', $Password).Password
+    $missing = @()
+    if ($plain.Length -lt 12) { $missing += 'pelo menos 12 caracteres' }
+    if ($plain -cnotmatch '\p{Lu}') { $missing += 'letra maiúscula' }
+    if ($plain -cnotmatch '\p{Ll}') { $missing += 'letra minúscula' }
+    if ($plain -cnotmatch '\p{Nd}') { $missing += 'número' }
+    if ($plain -cnotmatch '[\p{P}\p{S}]') { $missing += 'símbolo' }
+
+    if ($missing.Count -gt 0) {
+        throw "A senha do admin do Grafana não atende à política. Falta: $($missing -join ', ')."
+    }
+}
+
 function Merge-EnvironmentEntry {
     [CmdletBinding()]
     param(
@@ -204,4 +223,4 @@ function Set-ServiceEnvironment {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
