@@ -22,6 +22,7 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
                ts.judged AS Judged, ts.upheld AS Upheld, ts.rejected AS Rejected,
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
+               cfg.min_judged_for_grade AS MinJudgedForGrade,
                sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
                ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes, n.lead::text AS Lead
         FROM {source} s
@@ -85,13 +86,14 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         var meetsFloor = row.MinJudgedForPercentage is not null && judged >= row.MinJudgedForPercentage;
         var hasMeritBasis = row.AgreementBasis == "pretensao_autor";
         var upheldRatio = meetsFloor && hasMeritBasis ? Math.Round((decimal)upheld / judged, 4) : (decimal?)null;
+        var level = row.MinJudgedForGrade is not null && judged >= row.MinJudgedForGrade ? row.Level : null;
 
         var lastDecisionDate = row.LastDecisionDate is null ? (DateOnly?)null : DateOnly.FromDateTime(row.LastDecisionDate.Value);
 
         var courts = row.CourtCodes?.Cast<string>().ToArray() ?? [];
 
         return new ThemeSummary(
-            row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, row.Level,
+            row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, level,
             new ThemeOutcome(upheld, rejected, upheldRatio, row.PolarityLabel),
             row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate)
         {
@@ -115,6 +117,7 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         int? StrengthScore,
         string? Level,
         short? MinJudgedForPercentage,
+        short? MinJudgedForGrade,
         short? PeriodStartYear,
         short? PeriodEndYear,
         string? AgreementBasis,
