@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Unavailable;
 
 namespace Ratio.Api.Controllers;
 
@@ -24,6 +25,6 @@ public class ThemeCasesController(IThemeCasesReader themeCasesReader) : Controll
             return Problem(detail: "Tema não encontrado.", statusCode: StatusCodes.Status404NotFound);
         }
 
-        return Ok(cases);
+        return Ok(cases with { Unavailable = UnavailableBlocks.SampleColumns });
     }
 }
