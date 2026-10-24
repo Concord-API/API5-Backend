@@ -124,6 +124,31 @@ Describe 'custom.ini' {
     }
 }
 
+Describe 'Assert-GrafanaAdminPassword' {
+    BeforeAll {
+        function ConvertTo-Secret([string] $Value) {
+            ConvertTo-SecureString -String $Value -AsPlainText -Force
+        }
+    }
+
+    It 'aceita a senha que cumpre a política do Grafana' {
+        { Assert-GrafanaAdminPassword -Password (ConvertTo-Secret 'Ratio-Monitor-2026') } | Should -Not -Throw
+    }
+
+    It 'recusa a senha com menos de 12 caracteres' {
+        { Assert-GrafanaAdminPassword -Password (ConvertTo-Secret 'Ratio-2026') } | Should -Throw '*12 caracteres*'
+    }
+
+    It 'recusa a senha sem <Missing>' -TestCases @(
+        @{ Missing = 'letra maiúscula'; Password = 'ratio-monitor-2026' },
+        @{ Missing = 'letra minúscula'; Password = 'RATIO-MONITOR-2026' },
+        @{ Missing = 'número'; Password = 'Ratio-Monitor-Obs' },
+        @{ Missing = 'símbolo'; Password = 'RatioMonitor2026' }
+    ) {
+        { Assert-GrafanaAdminPassword -Password (ConvertTo-Secret $Password) } | Should -Throw "*$Missing*"
+    }
+}
+
 Describe 'Wait-ComponentReady' {
     BeforeEach {
         Mock Start-Sleep -ModuleName Observability
