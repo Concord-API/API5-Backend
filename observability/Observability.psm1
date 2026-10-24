@@ -66,13 +66,13 @@ function Wait-ComponentReady {
 }
 
 function Stop-ServiceIfPresent {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)] [string] $Name
     )
 
     $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
-    if ($null -ne $service -and $service.Status -ne 'Stopped') {
+    if ($null -ne $service -and $service.Status -ne 'Stopped' -and $PSCmdlet.ShouldProcess($Name, 'Parar o serviço')) {
         Stop-Service -Name $Name -Force
         $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(90))
     }
@@ -125,4 +125,83 @@ function Invoke-Installer {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer
+function Add-PreloadLibrary {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()] [string] $Current,
+        [Parameter(Mandatory)] [string] $Library
+    )
+
+    $libraries = @($Current -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($libraries -notcontains $Library) {
+        $libraries += $Library
+    }
+
+    $libraries -join ','
+}
+
+function Get-RandomPassword {
+    [CmdletBinding()]
+    param()
+
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $password = New-Object Text.StringBuilder
+    $buffer = New-Object byte[] 1
+    try {
+        while ($password.Length -lt 32) {
+            $generator.GetBytes($buffer)
+            if ($buffer[0] -lt 248) {
+                [void] $password.Append($alphabet[$buffer[0] % $alphabet.Length])
+            }
+        }
+    }
+    finally {
+        $generator.Dispose()
+    }
+
+    $password.ToString()
+}
+
+function Merge-EnvironmentEntry {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyCollection()] [string[]] $Entries,
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $Value
+    )
+
+    $kept = @($Entries | Where-Object { $_ -and -not $_.StartsWith("$Name=") })
+    $kept + "$Name=$Value"
+}
+
+function Get-ServiceEnvironment {
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param(
+        [Parameter(Mandatory)] [string] $Name
+    )
+
+    $key = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+    $value = Get-ItemProperty -Path $key -Name 'Environment' -ErrorAction SilentlyContinue
+    if ($null -eq $value) {
+        return [string[]] @()
+    }
+
+    [string[]] @($value.Environment)
+}
+
+function Set-ServiceEnvironment {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $Entries
+    )
+
+    $key = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+    if ($PSCmdlet.ShouldProcess($Name, 'Gravar as variáveis de ambiente do serviço')) {
+        New-ItemProperty -Path $key -Name 'Environment' -PropertyType MultiString -Value $Entries -Force | Out-Null
+    }
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment

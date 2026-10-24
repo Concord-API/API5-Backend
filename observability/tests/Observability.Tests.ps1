@@ -132,3 +132,44 @@ Describe 'Invoke-Installer' {
             Should -Throw '*Grafana*1603*'
     }
 }
+
+Describe 'Add-PreloadLibrary' {
+    It 'usa só o pg_stat_statements quando nada é pré-carregado' {
+        Add-PreloadLibrary -Current '' -Library 'pg_stat_statements' | Should -Be 'pg_stat_statements'
+    }
+
+    It 'mantém as bibliotecas que já são pré-carregadas' {
+        Add-PreloadLibrary -Current 'auto_explain' -Library 'pg_stat_statements' | Should -Be 'auto_explain,pg_stat_statements'
+    }
+
+    It 'não repete a biblioteca que já está na lista' {
+        Add-PreloadLibrary -Current 'auto_explain, pg_stat_statements' -Library 'pg_stat_statements' |
+            Should -Be 'auto_explain,pg_stat_statements'
+    }
+}
+
+Describe 'Get-RandomPassword' {
+    It 'gera uma senha de 32 caracteres só com letras e números' {
+        Get-RandomPassword | Should -Match '^[A-Za-z0-9]{32}$'
+    }
+
+    It 'gera uma senha diferente a cada chamada' {
+        Get-RandomPassword | Should -Not -Be (Get-RandomPassword)
+    }
+}
+
+Describe 'Merge-EnvironmentEntry' {
+    It 'acrescenta a variável às que o serviço já tem' {
+        Merge-EnvironmentEntry -Entries @('ALLOY_DEPLOY_MODE=windows') -Name 'RATIO_MONITOR_DSN' -Value 'postgresql://x' |
+            Should -Be @('ALLOY_DEPLOY_MODE=windows', 'RATIO_MONITOR_DSN=postgresql://x')
+    }
+
+    It 'troca o valor da variável que já existe' {
+        Merge-EnvironmentEntry -Entries @('RATIO_MONITOR_DSN=antigo', 'OUTRA=1') -Name 'RATIO_MONITOR_DSN' -Value 'novo' |
+            Should -Be @('OUTRA=1', 'RATIO_MONITOR_DSN=novo')
+    }
+
+    It 'funciona quando o serviço não tem nenhuma variável' {
+        Merge-EnvironmentEntry -Entries @() -Name 'RATIO_MONITOR_DSN' -Value 'novo' | Should -Be @('RATIO_MONITOR_DSN=novo')
+    }
+}
