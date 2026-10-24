@@ -13,11 +13,17 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
         "INSERT INTO dw.dim_decision_outcome (outcome_code, outcome_label, counts_in_metric) VALUES " +
         "('Granted', 'Procedente', true), ('Denied', 'Improcedente', true); " +
         "INSERT INTO dw.dim_movement (movement_code, movement_name, outcome_sk, code_verified, polarity_reference) " +
-        "SELECT m.code, m.name, o.outcome_sk, true, 'pretensao_autor' FROM (VALUES " +
-        "(219, 'Procedência', 'Granted'), (220, 'Improcedência', 'Denied')) AS m(code, name, outcome) " +
+        "SELECT m.code, m.name, o.outcome_sk, true, m.polarity FROM (VALUES " +
+        "(219, 'Procedência', 'Granted', 'pretensao_autor'), (220, 'Improcedência', 'Denied', 'pretensao_autor'), " +
+        "(237, 'Provimento', 'Granted', 'pretensao_recorrente'), (239, 'Não-Provimento', 'Denied', 'pretensao_recorrente')) " +
+        "AS m(code, name, outcome, polarity) " +
         "JOIN dw.dim_decision_outcome o ON o.outcome_code = m.outcome; " +
-        "INSERT INTO dw.dim_court (court_code, court_name, state_uf) VALUES ('TJSP', 'Tribunal de Justiça de São Paulo', 'SP'); " +
-        "INSERT INTO dw.dim_judging_body (court_sk, body_name) SELECT court_sk, '5ª Câmara de Direito Privado' FROM dw.dim_court; " +
+        "INSERT INTO dw.dim_court (court_code, court_name, state_uf) VALUES " +
+        "('TJSP', 'Tribunal de Justiça de São Paulo', 'SP'), ('STJ', 'Superior Tribunal de Justiça', 'DF'); " +
+        "INSERT INTO dw.dim_judging_body (court_sk, body_name) SELECT c.court_sk, b.body_name FROM (VALUES " +
+        "('TJSP', '5ª Câmara de Direito Privado'), ('STJ', 'Terceira Turma'), " +
+        "('STJ', 'GABINETE DO MINISTRO MARCO AURÉLIO BELLIZZE')) AS b(court_code, body_name) " +
+        "JOIN dw.dim_court c ON c.court_code = b.court_code; " +
         "INSERT INTO dw.dim_case_class (class_name, claimant_type) VALUES ('Apelação Cível', 'autor_particular'); " +
         "INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day) VALUES " +
         "(20240320, '2024-03-20', 2024, 1, 3, 'Março', 20), " +
@@ -52,7 +58,13 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
     private Task RefreshAsync() => ExecuteAsync("REFRESH MATERIALIZED VIEW dw.case_current_result");
 
     private async Task InsertCaseAsync(
-        string caseNumber, int movementCode, int dateSk, string? formatted = null, short secrecyLevel = 0)
+        string caseNumber,
+        int movementCode,
+        int dateSk,
+        string? formatted = null,
+        short secrecyLevel = 0,
+        string courtCode = "TJSP",
+        string bodyName = "5ª Câmara de Direito Privado")
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
         await connection.ExecuteAsync(
@@ -60,17 +72,17 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
             "case_number_formatted, source_link, source_link_type) " +
             "SELECT @caseNumber, c.court_sk, cc.case_class_sk, 'Second', @secrecyLevel, 'datajud', now(), " +
             "@formatted, 'https://esaj.tjsp.jus.br/' || @caseNumber, 'portal' " +
-            "FROM dw.dim_court c CROSS JOIN dw.dim_case_class cc; " +
+            "FROM dw.dim_court c CROSS JOIN dw.dim_case_class cc WHERE c.court_code = @courtCode; " +
             "INSERT INTO dw.bridge_case_subject (case_sk, subject_sk) " +
             "SELECT dc.case_sk, s.subject_sk FROM dw.dim_case dc, dw.dim_subject s " +
             "WHERE dc.case_number = @caseNumber AND s.subject_code = 1001; " +
             "INSERT INTO dw.fact_case_event (case_sk, court_sk, judging_body_sk, movement_sk, date_sk, occurred_at, source_url, extracted_at, natural_key) " +
             "SELECT dc.case_sk, dc.court_sk, jb.judging_body_sk, m.movement_sk, d.date_sk, d.full_date::timestamptz, " +
             "'https://example.org', now(), 'evt:' || dc.case_sk " +
-            "FROM dw.dim_case dc JOIN dw.dim_judging_body jb ON jb.court_sk = dc.court_sk " +
+            "FROM dw.dim_case dc JOIN dw.dim_judging_body jb ON jb.court_sk = dc.court_sk AND jb.body_name = @bodyName " +
             "JOIN dw.dim_movement m ON m.movement_code = @movementCode JOIN dw.dim_date d ON d.date_sk = @dateSk " +
             "WHERE dc.case_number = @caseNumber",
-            new { caseNumber, movementCode, dateSk, formatted, secrecyLevel });
+            new { caseNumber, movementCode, dateSk, formatted, secrecyLevel, courtCode, bodyName });
     }
 
     [Fact]
@@ -196,6 +208,43 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
         var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
 
         Assert.Equal(["CASE-3", "CASE-1", null], cases!.Cases.Select(sampleCase => sampleCase.CaseNumber));
+    }
+
+    [Fact]
+    public async Task Describes_an_appeal_by_whether_it_was_granted()
+    {
+        await InsertCaseAsync("CASE-1", 237, 20250910);
+        await InsertCaseAsync("CASE-2", 239, 20250615);
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        Assert.Equal(["Recurso provido", "Recurso não provido"], cases!.Cases.Select(sampleCase => sampleCase.Outcome));
+    }
+
+    [Fact]
+    public async Task Names_the_panel_of_the_STJ_in_the_chamber_column()
+    {
+        await InsertCaseAsync("CASE-1", 237, 20250615, courtCode: "STJ", bodyName: "Terceira Turma");
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        var sampleCase = Assert.Single(cases!.Cases);
+        Assert.Equal("STJ", sampleCase.CourtCode);
+        Assert.Equal("Terceira Turma", sampleCase.JudgingBody);
+    }
+
+    [Fact]
+    public async Task Leaves_the_chamber_empty_for_an_STJ_body_that_is_not_a_panel()
+    {
+        await InsertCaseAsync(
+            "CASE-1", 237, 20250615, courtCode: "STJ", bodyName: "GABINETE DO MINISTRO MARCO AURÉLIO BELLIZZE");
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        Assert.Null(Assert.Single(cases!.Cases).JudgingBody);
     }
 
     [Fact]
