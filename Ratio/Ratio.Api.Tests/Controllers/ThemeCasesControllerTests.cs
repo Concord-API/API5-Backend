@@ -24,7 +24,8 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
                 "datajud",
                 "https://esaj.tjsp.jus.br/cpopg/open.do",
                 "portal")
-        ]);
+        ],
+        12418);
 
     [Fact]
     public async Task Returns_the_cases_of_the_theme_with_the_declared_ordering()
