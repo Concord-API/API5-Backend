@@ -92,4 +92,20 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("Tema não encontrado.", body.GetProperty("detail").GetString());
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(101)]
+    public async Task Rejects_a_limit_outside_1_to_100(int limit)
+    {
+        var response = await _client.GetAsync($"/api/themes/416/cases?limit={limit}");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("O parâmetro 'limit' deve estar entre 1 e 100.", body.GetProperty("detail").GetString());
+        factory.ThemeCasesReader.Verify(
+            reader => reader.ListCasesAsync(416, It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
