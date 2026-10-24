@@ -65,6 +65,20 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         WHERE t.theme_key = @themeKey
         """;
 
+    private const string YearlyAlignmentSql = """
+        SELECT y.year AS Year,
+               y.claim_upheld_count + y.claim_rejected_count AS N,
+               y.claim_upheld_count AS Upheld,
+               s.claim_polarity_label AS PolarityLabel,
+               cfg.min_judged_for_percentage AS MinJudgedForPercentage
+        FROM dw.theme_by_year y
+        JOIN dw.dim_theme t ON t.theme_sk = y.theme_sk
+        JOIN dw.theme_summary s ON s.theme_sk = y.theme_sk
+        LEFT JOIN dw.strength_config cfg ON cfg.id = 1
+        WHERE t.theme_key = @themeKey
+        ORDER BY y.year
+        """;
+
     public async Task<ThemeDetail?> GetThemeAsync(long themeKey, CancellationToken cancellationToken)
     {
         try
@@ -94,11 +108,13 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             }
 
             var activity = await ReadCourtActivityAsync(connection, themeKey, cancellationToken);
+            var yearlyAlignments = await ReadYearlyAlignmentsAsync(connection, themeKey, cancellationToken);
 
             return Map(row) with
             {
                 OutcomeBreakdown = breakdown.Select(MapBreakdown).ToArray(),
-                CourtAlignments = courtAlignments.Select(alignment => WithActivity(MapCourtAlignment(alignment), activity)).ToArray()
+                CourtAlignments = courtAlignments.Select(alignment => WithActivity(MapCourtAlignment(alignment), activity)).ToArray(),
+                YearlyAlignments = yearlyAlignments.Select(MapYearlyAlignment).ToArray()
             };
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
@@ -180,6 +196,30 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
                 : null,
             row.PolarityLabel);
 
+    private static YearlyAlignment MapYearlyAlignment(YearlyAlignmentRow row) =>
+        new(
+            row.Year,
+            row.N,
+            row.MinJudgedForPercentage is not null && row.N >= row.MinJudgedForPercentage
+                ? Math.Round((decimal)row.Upheld / row.N, 4)
+                : null,
+            row.PolarityLabel);
+
+    private static async Task<IReadOnlyList<YearlyAlignmentRow>> ReadYearlyAlignmentsAsync(
+        NpgsqlConnection connection, long themeKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (await connection.QueryAsync<YearlyAlignmentRow>(
+                new CommandDefinition(YearlyAlignmentSql, new { themeKey }, cancellationToken: cancellationToken)))
+                .AsList();
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+        {
+            return [];
+        }
+    }
+
     private static DateOnly? ToDateOnly(DateTime? value) =>
         value is null ? null : DateOnly.FromDateTime(value.Value);
 
@@ -210,6 +250,13 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         short? MinJudgedForPercentage);
 
     private sealed record CourtActivityRow(string CourtCode, long Decisions, DateTime? LastDecisionDate);
+
+    private sealed record YearlyAlignmentRow(
+        short Year,
+        long N,
+        long Upheld,
+        string PolarityLabel,
+        short? MinJudgedForPercentage);
 
     private sealed record CourtAlignmentRow(
         string CourtCode,
