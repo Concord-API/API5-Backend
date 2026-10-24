@@ -15,7 +15,7 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
                source_link AS SourceLink, source_link_type AS SourceLinkType, secrecy_level > 0 AS Sealed
         FROM dw.theme_case_sample
         WHERE theme_key = @themeKey
-        ORDER BY decision_date DESC NULLS LAST, case_number
+        ORDER BY secrecy_level > 0, decision_date DESC NULLS LAST, case_number
         LIMIT @limit
         """;
 

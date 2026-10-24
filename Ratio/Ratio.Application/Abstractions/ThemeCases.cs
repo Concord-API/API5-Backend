@@ -22,7 +22,7 @@ public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases, 
 {
     private static readonly CultureInfo Portuguese = CultureInfo.GetCultureInfo("pt-BR");
 
-    public string Ordering => "julgamento mais recente primeiro; empate pelo número do processo";
+    public string Ordering => "julgamento mais recente primeiro; empate pelo número do processo; processos em sigilo no fim";
 
     public int Shown => Cases.Count;
 

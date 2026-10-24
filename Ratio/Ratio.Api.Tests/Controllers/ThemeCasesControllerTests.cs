@@ -40,7 +40,7 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(412, body.GetProperty("themeKey").GetInt64());
         Assert.Equal(
-            "julgamento mais recente primeiro; empate pelo número do processo",
+            "julgamento mais recente primeiro; empate pelo número do processo; processos em sigilo no fim",
             body.GetProperty("ordering").GetString());
         Assert.Equal(1, body.GetProperty("shown").GetInt32());
         Assert.Equal(12418, body.GetProperty("total").GetInt64());
