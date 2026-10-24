@@ -79,4 +79,15 @@ public class DependencyInjectionTests
 
         Assert.IsType<ScopeReader>(provider.GetRequiredService<IScopeReader>());
     }
+
+    [Fact]
+    public void Registers_the_theme_cases_reader()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<ThemeCasesReader>(provider.GetRequiredService<IThemeCasesReader>());
+    }
 }
