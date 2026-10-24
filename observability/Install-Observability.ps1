@@ -48,7 +48,11 @@ try {
     $alloyConfig = Join-Path $dataRoot 'alloy\config.alloy'
     New-Item -ItemType Directory -Path (Split-Path -Parent $alloyConfig) -Force | Out-Null
     Copy-Item -Path (Join-Path $PSScriptRoot 'alloy\config.alloy') -Destination $alloyConfig -Force
+    $alloyEnvironment = Get-ServiceEnvironment -Name 'Alloy'
     Invoke-Installer -Name 'Alloy' -FilePath $artifacts['alloy'] -ArgumentList '/S', "/CONFIG=$alloyConfig", '/DISABLEREPORTING=yes', '/DISABLEPROFILING=yes'
+    if ($alloyEnvironment.Count -gt 0) {
+        Set-ServiceEnvironment -Name 'Alloy' -Entries $alloyEnvironment
+    }
     Restart-Service -Name 'Alloy'
 
     Write-Host 'Instalando o Grafana...'

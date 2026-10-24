@@ -175,4 +175,33 @@ function Merge-EnvironmentEntry {
     $kept + "$Name=$Value"
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Merge-EnvironmentEntry
+function Get-ServiceEnvironment {
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param(
+        [Parameter(Mandatory)] [string] $Name
+    )
+
+    $key = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+    $value = Get-ItemProperty -Path $key -Name 'Environment' -ErrorAction SilentlyContinue
+    if ($null -eq $value) {
+        return [string[]] @()
+    }
+
+    [string[]] @($value.Environment)
+}
+
+function Set-ServiceEnvironment {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $Entries
+    )
+
+    $key = "HKLM:\SYSTEM\CurrentControlSet\Services\$Name"
+    if ($PSCmdlet.ShouldProcess($Name, 'Gravar as variáveis de ambiente do serviço')) {
+        New-ItemProperty -Path $key -Name 'Environment' -PropertyType MultiString -Value $Entries -Force | Out-Null
+    }
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
