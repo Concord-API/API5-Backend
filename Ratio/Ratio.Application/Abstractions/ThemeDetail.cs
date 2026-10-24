@@ -20,6 +20,10 @@ public sealed record ThemeDetail(
 
     public IReadOnlyList<CourtAlignment> CourtAlignments { get; init; } = [];
 
+    public IReadOnlyList<YearlyAlignment> YearlyAlignments { get; init; } = [];
+
+    public YearlyTrend? YearlyTrend { get; init; }
+
     public string PartialTreatment => "Na nota de força, a procedência em parte conta como acolhimento.";
 
     public IReadOnlyList<UnavailableBlock> Unavailable { get; init; } = [];
