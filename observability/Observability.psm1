@@ -125,4 +125,54 @@ function Invoke-Installer {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer
+function Add-PreloadLibrary {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()] [string] $Current,
+        [Parameter(Mandatory)] [string] $Library
+    )
+
+    $libraries = @($Current -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($libraries -notcontains $Library) {
+        $libraries += $Library
+    }
+
+    $libraries -join ','
+}
+
+function Get-RandomPassword {
+    [CmdletBinding()]
+    param()
+
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $password = New-Object Text.StringBuilder
+    $buffer = New-Object byte[] 1
+    try {
+        while ($password.Length -lt 32) {
+            $generator.GetBytes($buffer)
+            if ($buffer[0] -lt 248) {
+                [void] $password.Append($alphabet[$buffer[0] % $alphabet.Length])
+            }
+        }
+    }
+    finally {
+        $generator.Dispose()
+    }
+
+    $password.ToString()
+}
+
+function Merge-EnvironmentEntry {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyCollection()] [string[]] $Entries,
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $Value
+    )
+
+    $kept = @($Entries | Where-Object { $_ -and -not $_.StartsWith("$Name=") })
+    $kept + "$Name=$Value"
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Merge-EnvironmentEntry
