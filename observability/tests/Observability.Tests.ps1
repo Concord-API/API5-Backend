@@ -80,6 +80,50 @@ Describe 'artifacts.json' {
     }
 }
 
+Describe 'custom.ini' {
+    BeforeAll {
+        $settings = @{}
+        $section = ''
+        foreach ($line in Get-Content -Path (Join-Path $PSScriptRoot '..' 'grafana' 'custom.ini')) {
+            if ($line -match '^\[(.+)\]$') {
+                $section = $Matches[1]
+            }
+            elseif ($line -match '^([^=]+?)\s*=\s*(.*)$') {
+                $settings["$section.$($Matches[1])"] = $Matches[2]
+            }
+        }
+    }
+
+    It 'escuta só em 127.0.0.1' {
+        $settings['server.http_addr'] | Should -Be '127.0.0.1'
+    }
+
+    It 'desliga <Key>, que depende da internet' -TestCases @(
+        @{ Key = 'analytics.reporting_enabled'; Value = 'false' },
+        @{ Key = 'analytics.check_for_updates'; Value = 'false' },
+        @{ Key = 'analytics.check_for_plugin_updates'; Value = 'false' },
+        @{ Key = 'analytics.feedback_links_enabled'; Value = 'false' },
+        @{ Key = 'news.news_feed_enabled'; Value = 'false' },
+        @{ Key = 'plugins.preinstall_disabled'; Value = 'true' },
+        @{ Key = 'plugins.public_key_retrieval_disabled'; Value = 'true' },
+        @{ Key = 'plugins.plugin_admin_enabled'; Value = 'false' },
+        @{ Key = 'snapshots.external_enabled'; Value = 'false' },
+        @{ Key = 'security.disable_gravatar'; Value = 'true' },
+        @{ Key = 'public_dashboards.enabled'; Value = 'false' }
+    ) {
+        $settings[$Key] | Should -Be $Value
+    }
+
+    It 'mantém uma conta só com <Key> = <Value>' -TestCases @(
+        @{ Key = 'users.allow_sign_up'; Value = 'false' },
+        @{ Key = 'users.allow_org_create'; Value = 'false' },
+        @{ Key = 'auth.anonymous.enabled'; Value = 'false' },
+        @{ Key = 'auth.basic.password_policy'; Value = 'true' }
+    ) {
+        $settings[$Key] | Should -Be $Value
+    }
+}
+
 Describe 'Wait-ComponentReady' {
     BeforeEach {
         Mock Start-Sleep -ModuleName Observability
