@@ -28,4 +28,6 @@ public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases, 
 
     public string SampleLabel =>
         string.Format(Portuguese, "{0:N0} de {1:N0} {2}", Shown, Total, Total == 1 ? "decisão" : "decisões");
+
+    public IReadOnlyList<UnavailableBlock> Unavailable { get; init; } = [];
 }

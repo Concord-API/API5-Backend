@@ -77,6 +77,39 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
     }
 
     [Fact]
+    public async Task Flags_the_reporter_judge_and_amount_columns_without_a_source()
+    {
+        factory.ThemeCasesReader
+            .Setup(reader => reader.ListCasesAsync(418, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Cases with { ThemeKey = 418 });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/418/cases");
+
+        var unavailable = body.GetProperty("unavailable").EnumerateArray().ToArray();
+        Assert.Equal(["reporterJudge", "amountAwarded"], unavailable.Select(item => item.GetProperty("block").GetString()));
+        Assert.All(unavailable, item => Assert.Equal("sourceUnavailable", item.GetProperty("reason").GetString()));
+        Assert.Equal("O DataJud não publica o relator.", unavailable[0].GetProperty("message").GetString());
+        Assert.Equal(
+            "O valor fixado não é campo estruturado no DataJud; ele só existe no inteiro teor da decisão.",
+            unavailable[1].GetProperty("message").GetString());
+        var sampleCase = Assert.Single(body.GetProperty("cases").EnumerateArray());
+        Assert.False(sampleCase.TryGetProperty("reporterJudge", out _));
+        Assert.False(sampleCase.TryGetProperty("amountAwarded", out _));
+    }
+
+    [Fact]
+    public async Task Flags_the_columns_without_a_source_for_a_theme_without_cases()
+    {
+        factory.ThemeCasesReader
+            .Setup(reader => reader.ListCasesAsync(419, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ThemeCases(419, [], 0));
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/419/cases");
+
+        Assert.Equal(2, body.GetProperty("unavailable").GetArrayLength());
+    }
+
+    [Fact]
     public async Task Reads_twenty_cases_without_a_limit()
     {
         factory.ThemeCasesReader
