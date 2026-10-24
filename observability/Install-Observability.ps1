@@ -19,6 +19,12 @@ foreach ($artifact in $manifest) {
 Write-Host 'Conferindo os artefatos...'
 Assert-ArtifactFolder -Manifest $manifest -ArtifactsPath $ArtifactsPath
 
+$grafanaHome = Join-Path $env:ProgramFiles 'GrafanaLabs\grafana'
+$grafanaPassword = $null
+if (-not (Test-Path -Path (Join-Path $grafanaHome 'data\grafana.db') -PathType Leaf)) {
+    $grafanaPassword = Read-GrafanaAdminPassword
+}
+
 $staging = Join-Path ([IO.Path]::GetTempPath()) "ratio-observability-$([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $staging | Out-Null
 try {
@@ -57,7 +63,7 @@ try {
 
     Write-Host 'Instalando o Grafana...'
     Invoke-Installer -Name 'Grafana' -FilePath 'msiexec.exe' -ArgumentList '/i', "`"$($artifacts['grafana'])`"", '/qn', '/norestart'
-    Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\custom.ini') -Destination (Join-Path $env:ProgramFiles 'GrafanaLabs\grafana\conf\custom.ini') -Force
+    Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\custom.ini') -Destination (Join-Path $grafanaHome 'conf\custom.ini') -Force
     Restart-Service -Name 'Grafana'
 }
 finally {
@@ -70,9 +76,15 @@ Wait-ComponentReady -Name 'Loki' -Uri 'http://127.0.0.1:3100/ready'
 Wait-ComponentReady -Name 'Alloy' -Uri 'http://127.0.0.1:12345/-/ready'
 Wait-ComponentReady -Name 'Grafana' -Uri 'http://127.0.0.1:3000/api/health'
 
+if ($null -ne $grafanaPassword) {
+    Write-Host 'Definindo a senha do admin do Grafana...'
+    Set-GrafanaAdminPassword -GrafanaHome $grafanaHome -Password $grafanaPassword
+}
+
 Write-Host ''
 Write-Host 'Observabilidade instalada:'
 foreach ($artifact in $manifest | Where-Object { $_.name -ne 'winsw' }) {
     Write-Host "  $($artifact.name) $($artifact.version)"
 }
+Write-Host 'Grafana em http://127.0.0.1:3000, usuário admin. Para trocar a senha, rode o Reset-GrafanaAdminPassword.ps1.'
 Write-Host 'Para ativar a telemetria da API, defina OpenTelemetry__Endpoint=http://127.0.0.1:4317 e reinicie o serviço da API.'

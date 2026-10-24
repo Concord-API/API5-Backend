@@ -80,6 +80,104 @@ Describe 'artifacts.json' {
     }
 }
 
+Describe 'custom.ini' {
+    BeforeAll {
+        $settings = @{}
+        $section = ''
+        foreach ($line in Get-Content -Path (Join-Path $PSScriptRoot '..' 'grafana' 'custom.ini')) {
+            if ($line -match '^\[(.+)\]$') {
+                $section = $Matches[1]
+            }
+            elseif ($line -match '^([^=]+?)\s*=\s*(.*)$') {
+                $settings["$section.$($Matches[1])"] = $Matches[2]
+            }
+        }
+    }
+
+    It 'escuta só em 127.0.0.1' {
+        $settings['server.http_addr'] | Should -Be '127.0.0.1'
+    }
+
+    It 'desliga <Key>, que depende da internet' -TestCases @(
+        @{ Key = 'analytics.reporting_enabled'; Value = 'false' },
+        @{ Key = 'analytics.check_for_updates'; Value = 'false' },
+        @{ Key = 'analytics.check_for_plugin_updates'; Value = 'false' },
+        @{ Key = 'analytics.feedback_links_enabled'; Value = 'false' },
+        @{ Key = 'news.news_feed_enabled'; Value = 'false' },
+        @{ Key = 'plugins.preinstall_disabled'; Value = 'true' },
+        @{ Key = 'plugins.public_key_retrieval_disabled'; Value = 'true' },
+        @{ Key = 'plugins.plugin_admin_enabled'; Value = 'false' },
+        @{ Key = 'snapshots.external_enabled'; Value = 'false' },
+        @{ Key = 'security.disable_gravatar'; Value = 'true' },
+        @{ Key = 'public_dashboards.enabled'; Value = 'false' }
+    ) {
+        $settings[$Key] | Should -Be $Value
+    }
+
+    It 'mantém uma conta só com <Key> = <Value>' -TestCases @(
+        @{ Key = 'users.allow_sign_up'; Value = 'false' },
+        @{ Key = 'users.allow_org_create'; Value = 'false' },
+        @{ Key = 'auth.anonymous.enabled'; Value = 'false' },
+        @{ Key = 'auth.basic.password_policy'; Value = 'true' }
+    ) {
+        $settings[$Key] | Should -Be $Value
+    }
+}
+
+Describe 'Assert-GrafanaAdminPassword' {
+    BeforeAll {
+        function ConvertTo-Secret([string] $Value) {
+            ConvertTo-SecureString -String $Value -AsPlainText -Force
+        }
+    }
+
+    It 'aceita a senha que cumpre a política do Grafana' {
+        { Assert-GrafanaAdminPassword -Password (ConvertTo-Secret 'Ratio-Monitor-2026') } | Should -Not -Throw
+    }
+
+    It 'recusa a senha com menos de 12 caracteres' {
+        { Assert-GrafanaAdminPassword -Password (ConvertTo-Secret 'Ratio-2026') } | Should -Throw '*12 caracteres*'
+    }
+
+    It 'recusa a senha sem <Missing>' -TestCases @(
+        @{ Missing = 'letra maiúscula'; Password = 'ratio-monitor-2026' },
+        @{ Missing = 'letra minúscula'; Password = 'RATIO-MONITOR-2026' },
+        @{ Missing = 'número'; Password = 'Ratio-Monitor-Obs' },
+        @{ Missing = 'símbolo'; Password = 'RatioMonitor2026' }
+    ) {
+        { Assert-GrafanaAdminPassword -Password (ConvertTo-Secret $Password) } | Should -Throw "*$Missing*"
+    }
+}
+
+Describe 'Read-GrafanaAdminPassword' {
+    It 'devolve a senha digitada duas vezes' {
+        Mock Read-Host -ModuleName Observability { ConvertTo-SecureString -String 'Ratio-Monitor-2026' -AsPlainText -Force }
+
+        $password = Read-GrafanaAdminPassword
+
+        [Net.NetworkCredential]::new('', $password).Password | Should -Be 'Ratio-Monitor-2026'
+        Should -Invoke Read-Host -ModuleName Observability -Times 2 -Exactly
+    }
+
+    It 'recusa quando a confirmação não é igual à senha' {
+        $script:answers = @('Ratio-Monitor-2026', 'Ratio-Monitor-2027')
+        $script:reads = 0
+        Mock Read-Host -ModuleName Observability {
+            $answer = $script:answers[$script:reads]
+            $script:reads++
+            ConvertTo-SecureString -String $answer -AsPlainText -Force
+        }
+
+        { Read-GrafanaAdminPassword } | Should -Throw '*não são iguais*'
+    }
+
+    It 'recusa a senha fora da política' {
+        Mock Read-Host -ModuleName Observability { ConvertTo-SecureString -String 'Ratio-2026' -AsPlainText -Force }
+
+        { Read-GrafanaAdminPassword } | Should -Throw '*12 caracteres*'
+    }
+}
+
 Describe 'Wait-ComponentReady' {
     BeforeEach {
         Mock Start-Sleep -ModuleName Observability
