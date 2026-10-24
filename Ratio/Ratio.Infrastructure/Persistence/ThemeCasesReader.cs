@@ -12,7 +12,7 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
         SELECT COALESCE(case_number_formatted, case_number) AS CaseNumber, court_code AS CourtCode,
                judging_body AS JudgingBody, case_class AS CaseClass, court_level AS CourtLevel,
                decision_date AS DecisionDate, outcome_label AS Outcome, source AS Source,
-               source_link AS SourceLink, source_link_type AS SourceLinkType
+               source_link AS SourceLink, source_link_type AS SourceLinkType, secrecy_level > 0 AS Sealed
         FROM dw.theme_case_sample
         WHERE theme_key = @themeKey
         ORDER BY decision_date DESC NULLS LAST, case_number
@@ -54,7 +54,7 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
         }
     }
 
-    private static SampleCase ToSampleCase(CaseRow row) => new(
+    private static SampleCase ToSampleCase(CaseRow row) => row.Sealed ? SampleCase.SealedCase : new(
         row.CaseNumber,
         row.CourtCode,
         row.JudgingBody,
@@ -76,5 +76,6 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
         string Outcome,
         string Source,
         string? SourceLink,
-        string? SourceLinkType);
+        string? SourceLinkType,
+        bool Sealed);
 }
