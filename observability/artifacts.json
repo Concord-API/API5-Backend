@@ -1,0 +1,37 @@
+[
+  {
+    "name": "prometheus",
+    "version": "3.15.0",
+    "file": "prometheus-3.15.0.windows-amd64.zip",
+    "url": "https://github.com/prometheus/prometheus/releases/download/v3.15.0/prometheus-3.15.0.windows-amd64.zip",
+    "sha256": "5d333b385557d9adc2ff015d13da9809baccc52fb800a82d1e5c94b79258f87e"
+  },
+  {
+    "name": "loki",
+    "version": "3.7.8",
+    "file": "loki-windows-amd64.exe.zip",
+    "url": "https://github.com/grafana/loki/releases/download/v3.7.8/loki-windows-amd64.exe.zip",
+    "sha256": "622efc553df799ebb022c2e6c4b45792f726c54b008cb65126b99ae67be3a827"
+  },
+  {
+    "name": "winsw",
+    "version": "2.12.0",
+    "file": "WinSW-x64.exe",
+    "url": "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe",
+    "sha256": "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da"
+  },
+  {
+    "name": "alloy",
+    "version": "1.20.1",
+    "file": "alloy-installer-windows-amd64.exe",
+    "url": "https://github.com/grafana/alloy/releases/download/v1.20.1/alloy-installer-windows-amd64.exe",
+    "sha256": "23fcfe3755f02e8a6a83f27149851322ab2b66d584e76d239d9c031f50d3a8f0"
+  },
+  {
+    "name": "grafana",
+    "version": "13.2.3",
+    "file": "grafana_13.2.3_36482603486_windows_amd64.msi",
+    "url": "https://dl.grafana.com/grafana/release/13.2.3/grafana_13.2.3_36482603486_windows_amd64.msi",
+    "sha256": "0c1183e3d0e827685471f097c87ff2d1e4680340f7142779a780f024e6f42d3d"
+  }
+]
