@@ -111,4 +111,18 @@ function Register-WinSWService {
     Start-Service -Name $Name
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService
+function Invoke-Installer {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $FilePath,
+        [Parameter(Mandatory)] [string[]] $ArgumentList
+    )
+
+    $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Wait -PassThru
+    if ($process.ExitCode -notin 0, 3010) {
+        throw "O instalador do $Name terminou com o código $($process.ExitCode)."
+    }
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer
