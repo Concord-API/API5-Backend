@@ -182,6 +182,21 @@ function Assert-GrafanaAdminPassword {
     }
 }
 
+function Read-GrafanaAdminPassword {
+    [CmdletBinding()]
+    [OutputType([securestring])]
+    param()
+
+    $password = Read-Host 'Senha do admin do Grafana' -AsSecureString
+    $confirmation = Read-Host 'Repita a senha do admin do Grafana' -AsSecureString
+    if ([Net.NetworkCredential]::new('', $password).Password -cne [Net.NetworkCredential]::new('', $confirmation).Password) {
+        throw 'As duas senhas do admin do Grafana não são iguais.'
+    }
+
+    Assert-GrafanaAdminPassword -Password $password
+    $password
+}
+
 function Set-GrafanaAdminPassword {
     [CmdletBinding(SupportsShouldProcess)]
     param(
@@ -251,4 +266,4 @@ function Set-ServiceEnvironment {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
