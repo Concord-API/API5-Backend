@@ -186,6 +186,19 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
     }
 
     [Fact]
+    public async Task Lists_a_sealed_case_after_the_public_ones()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20240320);
+        await InsertCaseAsync("CASE-2", 220, 20250910, secrecyLevel: 2);
+        await InsertCaseAsync("CASE-3", 219, 20250615);
+        await RefreshAsync();
+
+        var cases = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+
+        Assert.Equal(["CASE-3", "CASE-1", null], cases!.Cases.Select(sampleCase => sampleCase.CaseNumber));
+    }
+
+    [Fact]
     public async Task Returns_no_cases_for_a_theme_without_judgments()
     {
         await InsertCaseAsync("CASE-1", 219, 20250615);
