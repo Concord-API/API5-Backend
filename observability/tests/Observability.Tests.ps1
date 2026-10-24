@@ -111,3 +111,24 @@ Describe 'Wait-ComponentReady' {
             Should -Throw '*Grafana*http://127.0.0.1:3000/api/health*'
     }
 }
+
+Describe 'Invoke-Installer' {
+    It 'aceita o instalador que termina com sucesso' {
+        Mock Start-Process -ModuleName Observability { [pscustomobject] @{ ExitCode = 0 } }
+
+        { Invoke-Installer -Name 'Alloy' -FilePath 'alloy-installer.exe' -ArgumentList '/S' } | Should -Not -Throw
+    }
+
+    It 'aceita o instalador que pede reinício' {
+        Mock Start-Process -ModuleName Observability { [pscustomobject] @{ ExitCode = 3010 } }
+
+        { Invoke-Installer -Name 'Grafana' -FilePath 'msiexec.exe' -ArgumentList '/i', 'grafana.msi', '/qn' } | Should -Not -Throw
+    }
+
+    It 'recusa o instalador que termina com erro, citando o componente e o código' {
+        Mock Start-Process -ModuleName Observability { [pscustomobject] @{ ExitCode = 1603 } }
+
+        { Invoke-Installer -Name 'Grafana' -FilePath 'msiexec.exe' -ArgumentList '/i', 'grafana.msi', '/qn' } |
+            Should -Throw '*Grafana*1603*'
+    }
+}
