@@ -1,4 +1,5 @@
 using Dapper;
+using Ratio.Application.Abstractions;
 using Ratio.Infrastructure.Migrations;
 using Ratio.Infrastructure.Persistence;
 using Npgsql;
@@ -140,7 +141,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     {
         await InsertThemeAsync(30, "Cobrança de dívida");
 
-        var results = await _reader.SearchThemesAsync("cobranca de divida", 20, CancellationToken.None);
+        var results = await _reader.SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None);
 
         Assert.Empty(results);
     }
@@ -148,7 +149,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     [Fact]
     public async Task Returns_no_top_themes_when_the_warehouse_was_never_loaded()
     {
-        var results = await _reader.TopThemesAsync(20, CancellationToken.None);
+        var results = await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None);
 
         Assert.Empty(results);
     }
@@ -160,7 +161,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(1, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var results = await _reader.SearchThemesAsync("cobranca de divida", 20, CancellationToken.None);
+        var results = await _reader.SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None);
 
         var theme = Assert.Single(results);
         Assert.Equal(1, theme.ThemeKey);
@@ -185,7 +186,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(40, upheldCount: 2, rejectedCount: 1, dateSk: 20240615, batch: "b");
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("negativacao apos quitacao", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("negativacao apos quitacao", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(2021, theme.PeriodStartYear);
         Assert.Equal(2024, theme.PeriodEndYear);
@@ -199,7 +200,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(41, upheldCount: 2, rejectedCount: 1, dateSk: 20240615, batch: "b");
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.TopThemesAsync(20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(2021, theme.PeriodStartYear);
         Assert.Equal(2024, theme.PeriodEndYear);
@@ -213,7 +214,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertNarrativeAsync(43);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.NotNull(theme.Summary);
         Assert.Equal(3, theme.Summary.Lead.Count);
@@ -232,7 +233,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertNarrativeAsync(44);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.TopThemesAsync(20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
 
         Assert.NotNull(theme.Summary);
         Assert.Equal("Em ", theme.Summary.Lead[0].GetProperty("text").GetString());
@@ -245,7 +246,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(45, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de seguro prestamista", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Null(theme.Summary);
     }
@@ -257,7 +258,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(2, upheldCount: 1, rejectedCount: 0, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca indevida de tarifa", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca indevida de tarifa", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(1, theme.JudgedCount);
         Assert.Equal(1, theme.Outcome.Upheld);
@@ -271,7 +272,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(42, upheldCount: 5, rejectedCount: 1, dateSk: 20240615, upheldMovement: 237, rejectedMovement: 239);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("revisao de contrato bancario", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("revisao de contrato bancario", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(6, theme.JudgedCount);
         Assert.Equal(5, theme.Outcome.Upheld);
@@ -287,7 +288,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertUnjudgedCaseAsync(3);
         await RefreshAggregatesAsync();
 
-        Assert.Empty(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, CancellationToken.None));
+        Assert.Empty(await _reader.SearchThemesAsync("tema sem julgamento algum", 20, ThemeFilters.None, CancellationToken.None));
     }
 
     [Fact]
@@ -299,7 +300,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(5, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var results = await _reader.SearchThemesAsync("atraso", 20, CancellationToken.None);
+        var results = await _reader.SearchThemesAsync("atraso", 20, ThemeFilters.None, CancellationToken.None);
 
         Assert.Equal(["Multa por atraso de voo", "Atraso de entrega de imóvel"], results.Select(theme => theme.Name));
         Assert.True(results[0].StrengthScore > results[1].StrengthScore);
@@ -376,7 +377,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(19, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var results = await _reader.TopThemesAsync(20, CancellationToken.None);
+        var results = await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None);
 
         Assert.Equal([19L, 18L], results.Select(theme => theme.ThemeKey));
         var theme = results[0];
@@ -398,7 +399,7 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertUnjudgedCaseAsync(30);
         await RefreshAggregatesAsync();
 
-        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida prescrita", 20, CancellationToken.None));
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida prescrita", 20, ThemeFilters.None, CancellationToken.None));
 
         Assert.Equal(144, theme.JudgedCount);
     }
@@ -412,11 +413,44 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await InsertJudgedCasesAsync(32, upheldCount: 38, rejectedCount: 2, dateSk: 20240615);
         await RefreshAggregatesAsync();
 
-        var results = await _reader.SearchThemesAsync("cobranca", 20, CancellationToken.None);
+        var results = await _reader.SearchThemesAsync("cobranca", 20, ThemeFilters.None, CancellationToken.None);
 
         Assert.Equal(["Cobrança de seguro prestamista", "Cobrança de tarifa bancária"], results.Select(theme => theme.Name));
         Assert.Equal([69, 37], results.Select(theme => theme.StrengthScore ?? -1));
         Assert.Equal([40L, 1000L], results.Select(theme => theme.JudgedCount));
+    }
+
+    [Fact]
+    public async Task Passes_the_filters_to_the_search()
+    {
+        await InsertThemeAsync(1, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(1, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var otherCourt = await _reader.SearchThemesAsync(
+            "cobranca de divida", 20, ThemeFilters.None with { Courts = ["TJRJ"] }, CancellationToken.None);
+        var matching = await _reader.SearchThemesAsync(
+            "cobranca de divida", 20, new ThemeFilters(["TJSP"], 5, ["First"], 0), CancellationToken.None);
+
+        Assert.Empty(otherCourt);
+        Assert.Equal([1L], matching.Select(theme => theme.ThemeKey));
+    }
+
+    [Fact]
+    public async Task Passes_the_filters_to_the_top_themes()
+    {
+        await InsertThemeAsync(1, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(1, upheldCount: 3, rejectedCount: 1, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var otherInstance = await _reader.TopThemesAsync(20, ThemeFilters.None with { Levels = ["Second"] }, CancellationToken.None);
+        var olderThanPeriod = await _reader.TopThemesAsync(20, ThemeFilters.None with { PeriodYears = 2 }, CancellationToken.None);
+        var aboveStrength = await _reader.TopThemesAsync(20, ThemeFilters.None with { MinStrength = 101 }, CancellationToken.None);
+
+        Assert.Empty(otherInstance);
+        Assert.Empty(olderThanPeriod);
+        Assert.Empty(aboveStrength);
+        Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
     }
 
     private sealed record TopTheme(long ThemeKey, string ThemeName, float? Rank, long Position);

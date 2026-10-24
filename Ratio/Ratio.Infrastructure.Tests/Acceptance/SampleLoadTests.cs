@@ -46,7 +46,7 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
         await LoadSampleAsync();
 
         var results = await new ThemeSearchReader(_dataSource, NullLogger<ThemeSearchReader>.Instance)
-            .SearchThemesAsync("cobranca de divida", 20, CancellationToken.None);
+            .SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None);
 
         var theme = Assert.Single(results);
         Assert.True(theme.JudgedCount > 0);
@@ -59,7 +59,7 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
         await LoadSampleAsync();
 
         var results = await new ThemeSearchReader(_dataSource, NullLogger<ThemeSearchReader>.Instance)
-            .TopThemesAsync(20, CancellationToken.None);
+            .TopThemesAsync(20, ThemeFilters.None, CancellationToken.None);
 
         Assert.True(results.Count >= 2);
     }
@@ -84,5 +84,21 @@ public class SampleLoadTests : IClassFixture<PostgresFixture>, IAsyncLifetime
         var counts = await new PanelAlignmentReader(_dataSource).GetThemeAsync(1, CancellationToken.None);
 
         Assert.NotNull(counts);
+    }
+
+    [Fact]
+    public async Task Reads_the_last_decision_per_court_after_sample_load()
+    {
+        await LoadSampleAsync();
+
+        var detail = await new ThemeDetailReader(_dataSource, NullLogger<ThemeDetailReader>.Instance)
+            .GetThemeAsync(1, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.All(detail.CourtAlignments, alignment =>
+        {
+            Assert.True(alignment.Decisions > 0);
+            Assert.NotNull(alignment.LastDecisionDate);
+        });
     }
 }
