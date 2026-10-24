@@ -179,6 +179,54 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
     }
 
     [Fact]
+    public async Task Withholds_the_grade_but_keeps_the_score_below_the_minimum_judged_cases()
+    {
+        await InsertThemeAsync(50, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(50, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+        await ExecuteAsync("UPDATE dw.strength_config SET min_judged_for_grade = 145");
+
+        var searched = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None));
+        var top = Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
+
+        Assert.Null(searched.Level);
+        Assert.Equal(78, searched.StrengthScore);
+        Assert.Null(top.Level);
+        Assert.Equal(78, top.StrengthScore);
+    }
+
+    [Theory]
+    [InlineData(9, null)]
+    [InlineData(10, "Em formação")]
+    public async Task Applies_the_default_minimum_of_ten_judged_cases_to_the_grade(int judged, string? expectedLevel)
+    {
+        await InsertThemeAsync(52, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(52, upheldCount: judged, rejectedCount: 0, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None));
+
+        Assert.Equal(judged, theme.JudgedCount);
+        Assert.NotNull(theme.StrengthScore);
+        Assert.Equal(expectedLevel, theme.Level);
+    }
+
+    [Fact]
+    public async Task Returns_the_grade_from_exactly_the_minimum_judged_cases()
+    {
+        await InsertThemeAsync(51, "Cobrança de dívida");
+        await InsertJudgedCasesAsync(51, upheldCount: 142, rejectedCount: 2, dateSk: 20240615);
+        await RefreshAggregatesAsync();
+        await ExecuteAsync("UPDATE dw.strength_config SET min_judged_for_grade = 144");
+
+        var searched = Assert.Single(await _reader.SearchThemesAsync("cobranca de divida", 20, ThemeFilters.None, CancellationToken.None));
+        var top = Assert.Single(await _reader.TopThemesAsync(20, ThemeFilters.None, CancellationToken.None));
+
+        Assert.Equal("Dominante", searched.Level);
+        Assert.Equal("Dominante", top.Level);
+    }
+
+    [Fact]
     public async Task Returns_the_period_from_the_first_to_the_last_decision()
     {
         await InsertThemeAsync(40, "Negativação após quitação");

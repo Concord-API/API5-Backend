@@ -15,11 +15,12 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
                s.period_start_year AS PeriodStartYear, s.period_end_year AS PeriodEndYear,
                ts.last_decision_date AS LastDecisionDate, n.lead::text AS Lead, n.body::text AS Body,
                n.text_origin AS TextOrigin, n.methodology_version AS MethodologyVersion,
-               n.generated_at AS GeneratedAt
+               n.generated_at AS GeneratedAt, cfg.min_judged_for_grade AS MinJudgedForGrade
         FROM dw.dim_theme t
         LEFT JOIN dw.theme_summary s ON s.theme_sk = t.theme_sk
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
         LEFT JOIN dw.theme_narrative n ON n.theme_sk = t.theme_sk
+        LEFT JOIN dw.strength_config cfg ON cfg.id = 1
         WHERE t.theme_key = @themeKey
         """;
 
@@ -131,7 +132,7 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
             row.Name,
             row.SubjectArea,
             row.StrengthScore,
-            row.Level,
+            row.MinJudgedForGrade is not null && row.JudgedCount >= row.MinJudgedForGrade ? row.Level : null,
             row.CaseCount ?? 0,
             row.JudgedCount ?? 0,
             row.CourtCount ?? 0,
@@ -255,7 +256,8 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         string? Body,
         string? TextOrigin,
         string? MethodologyVersion,
-        DateTime? GeneratedAt);
+        DateTime? GeneratedAt,
+        short? MinJudgedForGrade);
 
     private sealed record BreakdownRow(
         string PolarityLabel,
