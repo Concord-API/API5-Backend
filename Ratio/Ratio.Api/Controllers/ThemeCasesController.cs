@@ -17,7 +17,7 @@ public class ThemeCasesController(IThemeCasesReader themeCasesReader) : Controll
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        var cases =await themeCasesReader.ListCasesAsync(key, limit ?? 20, cancellationToken);
+        var cases = await themeCasesReader.ListCasesAsync(key, limit ?? 20, cancellationToken);
 
         if (cases is null)
         {
