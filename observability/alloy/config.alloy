@@ -69,3 +69,21 @@ prometheus.scrape "host" {
   scrape_interval = "1m"
   scrape_timeout  = "30s"
 }
+
+prometheus.exporter.postgres "ratio" {
+  data_source_names  = [coalesce(sys.env("RATIO_MONITOR_DSN"), "postgresql://ratio_monitor@127.0.0.1:5432/ratio?sslmode=disable")]
+  enabled_collectors = ["database", "locks", "replication", "replication_slot", "roles", "stat_bgwriter", "stat_database", "stat_progress_vacuum", "stat_statements", "stat_user_tables", "statio_user_tables", "wal"]
+
+  stat_statements {
+    include_query = true
+    limit         = 50
+    query_length  = 200
+  }
+}
+
+prometheus.scrape "postgres" {
+  targets         = prometheus.exporter.postgres.ratio.targets
+  forward_to      = [prometheus.remote_write.local.receiver]
+  scrape_interval = "1m"
+  scrape_timeout  = "30s"
+}
