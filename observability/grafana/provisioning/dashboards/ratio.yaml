@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: ratio
+    type: file
+    folder: Ratio
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: C:\ProgramData\Ratio\observability\grafana\dashboards
+      foldersFromFilesStructure: false

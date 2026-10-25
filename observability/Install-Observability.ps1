@@ -67,6 +67,13 @@ try {
     $grafanaDatasources = Join-Path $grafanaHome 'conf\provisioning\datasources'
     New-Item -ItemType Directory -Path $grafanaDatasources -Force | Out-Null
     Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\provisioning\datasources\ratio.yaml') -Destination $grafanaDatasources -Force
+    $grafanaProviders = Join-Path $grafanaHome 'conf\provisioning\dashboards'
+    New-Item -ItemType Directory -Path $grafanaProviders -Force | Out-Null
+    Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\provisioning\dashboards\ratio.yaml') -Destination $grafanaProviders -Force
+    $grafanaDashboards = Join-Path $dataRoot 'grafana\dashboards'
+    New-Item -ItemType Directory -Path $grafanaDashboards -Force | Out-Null
+    Remove-Item -Path (Join-Path $grafanaDashboards '*.json') -Force
+    Copy-Item -Path (Join-Path $PSScriptRoot 'grafana\dashboards\*.json') -Destination $grafanaDashboards -Force
     Restart-Service -Name 'Grafana'
 }
 finally {
