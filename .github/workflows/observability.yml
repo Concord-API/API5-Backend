@@ -1,0 +1,65 @@
+name: Observability
+
+on:
+  pull_request:
+    branches: [main, 'us*']
+    paths:
+      - .github/workflows/observability.yml
+      - observability/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/observability.yml
+      - observability/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observability-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARTIFACTS_PATH: ${{ github.workspace }}\observability-artifacts
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  observability:
+    name: Observability checks
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Restore the observability artifacts
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: observability-artifacts
+          key: observability-artifacts-${{ hashFiles('observability/artifacts.json') }}
+      - name: Download and check the artifacts with Windows PowerShell 5.1
+        shell: powershell
+        run: .\observability\Get-ObservabilityArtifacts.ps1 -Destination $env:ARTIFACTS_PATH
+      - name: Validate the Prometheus, Loki and Alloy configuration
+        run: .\observability\tests\Test-ObservabilityConfig.ps1 -ArtifactsPath $env:ARTIFACTS_PATH
+      - name: Install Pester and PSScriptAnalyzer
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Force
+      - name: Run the Pester tests
+        run: |
+          Import-Module Pester -RequiredVersion 5.7.1
+          Invoke-Pester -Path observability/tests -CI
+      - name: Analyze the scripts for Windows PowerShell 5.1
+        run: |
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.24.0
+          $findings = foreach ($file in Get-ChildItem observability/*.ps1, observability/*.psm1) {
+            Invoke-ScriptAnalyzer -Path $file.FullName -Settings observability/PSScriptAnalyzerSettings.psd1
+          }
+          $findings | Format-Table RuleName, ScriptName, Line, Message -AutoSize -Wrap
+          if (@($findings).Count -gt 0) {
+            throw "O PSScriptAnalyzer encontrou $(@($findings).Count) problema(s)."
+          }
