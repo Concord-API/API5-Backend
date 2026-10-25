@@ -158,6 +158,63 @@ Describe 'fontes de dados do Grafana' {
     }
 }
 
+Describe 'painéis do Grafana' {
+    BeforeAll {
+        function Get-Panel([object[]] $Items) {
+            foreach ($item in $Items) {
+                $item
+                if ($item.PSObject.Properties['panels']) {
+                    Get-Panel $item.panels
+                }
+            }
+        }
+
+        $folder = Join-Path $PSScriptRoot '..' 'grafana' 'dashboards'
+        $dashboards = @(Get-ChildItem -Path $folder -Filter '*.json' -ErrorAction SilentlyContinue | ForEach-Object {
+                [pscustomobject] @{ File = $_.Name; Json = Get-Content -Path $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json }
+            })
+        $targets = @(foreach ($dashboard in $dashboards) {
+                foreach ($panel in Get-Panel $dashboard.Json.panels) {
+                    if ($panel.PSObject.Properties['targets']) {
+                        foreach ($target in $panel.targets) {
+                            [pscustomobject] @{ Where = "$($dashboard.File) / $($panel.title)"; Target = $target }
+                        }
+                    }
+                }
+            })
+        $expressions = @($targets | Where-Object { $_.Target.PSObject.Properties['expr'] })
+    }
+
+    It 'tem os cinco painéis' {
+        $dashboards.File | Sort-Object | Should -Be @('api.json', 'banco.json', 'dados.json', 'servidor.json', 'visao-geral.json')
+    }
+
+    It 'dá a cada painel um uid único que começa com ratio-' {
+        $uids = $dashboards | ForEach-Object { $_.Json.uid }
+        $uids | ForEach-Object { $_ | Should -Match '^ratio-' }
+        @($uids | Sort-Object -Unique).Count | Should -Be $dashboards.Count
+    }
+
+    It 'consulta só as fontes prometheus e loki' {
+        $targets.Count | Should -BeGreaterThan 0
+        foreach ($item in $targets) {
+            $item.Target.datasource.uid | Should -BeIn @('prometheus', 'loki') -Because $item.Where
+        }
+    }
+
+    It 'usa $__rate_interval em todo rate' {
+        foreach ($item in $expressions) {
+            $item.Target.expr | Should -Not -Match '\b(i?rate)\([^\]]*\[\d+[smhd]\]' -Because $item.Where
+        }
+    }
+
+    It 'deixa as rotas de health fora das métricas HTTP' {
+        foreach ($item in $expressions | Where-Object { $_.Target.expr -match 'http_server_request_duration_seconds' }) {
+            $item.Target.expr | Should -Match 'http_route!~"health\.\*"' -Because $item.Where
+        }
+    }
+}
+
 Describe 'Assert-GrafanaAdminPassword' {
     BeforeAll {
         function ConvertTo-Secret([string] $Value) {
