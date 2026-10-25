@@ -98,6 +98,10 @@ Describe 'custom.ini' {
         $settings['server.http_addr'] | Should -Be '127.0.0.1'
     }
 
+    It 'abre na Visão geral instalada' {
+        $settings['dashboards.default_home_dashboard_path'] | Should -Be 'C:\ProgramData\Ratio\observability\grafana\dashboards\visao-geral.json'
+    }
+
     It 'desliga <Key>, que depende da internet' -TestCases @(
         @{ Key = 'analytics.reporting_enabled'; Value = 'false' },
         @{ Key = 'analytics.check_for_updates'; Value = 'false' },
@@ -147,6 +151,10 @@ Describe 'fontes de dados do Grafana' {
         $sources['Prometheus'].isDefault | Should -Be 'true'
     }
 
+    It 'avisa o Grafana que o Prometheus recebe uma amostra por minuto' {
+        $sources['Prometheus'].timeInterval | Should -Be '60s'
+    }
+
     It 'provisiona o Loki em 127.0.0.1:3100' {
         $sources['Loki'].type | Should -Be 'loki'
         $sources['Loki'].uid | Should -Be 'loki'
@@ -155,6 +163,63 @@ Describe 'fontes de dados do Grafana' {
 
     It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }) {
         $sources[$Name].editable | Should -Be 'false'
+    }
+}
+
+Describe 'painéis do Grafana' {
+    BeforeAll {
+        function Get-Panel([object[]] $Items) {
+            foreach ($item in $Items) {
+                $item
+                if ($item.PSObject.Properties['panels']) {
+                    Get-Panel $item.panels
+                }
+            }
+        }
+
+        $folder = Join-Path $PSScriptRoot '..' 'grafana' 'dashboards'
+        $dashboards = @(Get-ChildItem -Path $folder -Filter '*.json' -ErrorAction SilentlyContinue | ForEach-Object {
+                [pscustomobject] @{ File = $_.Name; Json = Get-Content -Path $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json }
+            })
+        $targets = @(foreach ($dashboard in $dashboards) {
+                foreach ($panel in Get-Panel $dashboard.Json.panels) {
+                    if ($panel.PSObject.Properties['targets']) {
+                        foreach ($target in $panel.targets) {
+                            [pscustomobject] @{ Where = "$($dashboard.File) / $($panel.title)"; Target = $target }
+                        }
+                    }
+                }
+            })
+        $expressions = @($targets | Where-Object { $_.Target.PSObject.Properties['expr'] })
+    }
+
+    It 'tem os cinco painéis' {
+        $dashboards.File | Sort-Object | Should -Be @('api.json', 'banco.json', 'dados.json', 'servidor.json', 'visao-geral.json')
+    }
+
+    It 'dá a cada painel um uid único que começa com ratio-' {
+        $uids = $dashboards | ForEach-Object { $_.Json.uid }
+        $uids | ForEach-Object { $_ | Should -Match '^ratio-' }
+        @($uids | Sort-Object -Unique).Count | Should -Be $dashboards.Count
+    }
+
+    It 'consulta só as fontes prometheus e loki' {
+        $targets.Count | Should -BeGreaterThan 0
+        foreach ($item in $targets) {
+            $item.Target.datasource.uid | Should -BeIn @('prometheus', 'loki') -Because $item.Where
+        }
+    }
+
+    It 'usa $__rate_interval em todo rate' {
+        foreach ($item in $expressions) {
+            $item.Target.expr | Should -Not -Match '\b(i?rate)\([^\]]*\[\d+[smhd]\]' -Because $item.Where
+        }
+    }
+
+    It 'deixa as rotas de health fora das métricas HTTP' {
+        foreach ($item in $expressions | Where-Object { $_.Target.expr -match 'http_server_request_duration_seconds' }) {
+            $item.Target.expr | Should -Match 'http_route!~"health\.\*"' -Because $item.Where
+        }
     }
 }
 

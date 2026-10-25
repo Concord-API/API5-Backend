@@ -8,6 +8,8 @@ datasources:
     url: http://127.0.0.1:9090
     isDefault: true
     editable: false
+    jsonData:
+      timeInterval: 60s
   - name: Loki
     uid: loki
     type: loki
