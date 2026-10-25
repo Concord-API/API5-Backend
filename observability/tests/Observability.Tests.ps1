@@ -98,6 +98,10 @@ Describe 'custom.ini' {
         $settings['server.http_addr'] | Should -Be '127.0.0.1'
     }
 
+    It 'abre na Visão geral instalada' {
+        $settings['dashboards.default_home_dashboard_path'] | Should -Be 'C:\ProgramData\Ratio\observability\grafana\dashboards\visao-geral.json'
+    }
+
     It 'desliga <Key>, que depende da internet' -TestCases @(
         @{ Key = 'analytics.reporting_enabled'; Value = 'false' },
         @{ Key = 'analytics.check_for_updates'; Value = 'false' },
@@ -145,6 +149,10 @@ Describe 'fontes de dados do Grafana' {
         $sources['Prometheus'].uid | Should -Be 'prometheus'
         $sources['Prometheus'].url | Should -Be 'http://127.0.0.1:9090'
         $sources['Prometheus'].isDefault | Should -Be 'true'
+    }
+
+    It 'avisa o Grafana que o Prometheus recebe uma amostra por minuto' {
+        $sources['Prometheus'].timeInterval | Should -Be '60s'
     }
 
     It 'provisiona o Loki em 127.0.0.1:3100' {
