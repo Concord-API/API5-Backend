@@ -18,11 +18,29 @@ public sealed class PanelAlignmentReader(NpgsqlDataSource dataSource) : IPanelAl
         """;
 
     private const string BodiesSql = """
-        SELECT court_code AS CourtCode, body_name AS BodyName, is_panel AS IsPanel,
-               appeal_upheld_count AS Upheld, appeal_rejected_count AS Rejected
-        FROM dw.theme_by_judging_body
-        WHERE theme_sk = @themeSk AND appeal_upheld_count + appeal_rejected_count > 0
-        ORDER BY court_code, body_name NULLS LAST
+        WITH bodies AS (
+            SELECT court_code, body_name, is_panel,
+                   appeal_upheld_count AS upheld, appeal_rejected_count AS rejected,
+                   regexp_replace(body_name, '^\s*gab(inete)?\.?\s*(\d+\s*-|d[ao]s?\M)\s*', '', 'i') AS panel_name
+            FROM dw.theme_by_judging_body
+            WHERE theme_sk = @themeSk AND appeal_upheld_count + appeal_rejected_count > 0
+        ),
+        named AS (
+            SELECT court_code, upheld, rejected,
+                   NOT is_panel
+                   AND panel_name <> body_name
+                   AND public.unaccent(lower(panel_name)) ~ '(camara|turma|secao|orgao especial|corte especial|plenario)'
+                   AND public.unaccent(lower(panel_name)) !~ '(recursal|gabinete|\mgab\M|vara|presidencia|juizado)' AS cabinet,
+                   is_panel, body_name, panel_name
+            FROM bodies
+        )
+        SELECT court_code AS CourtCode,
+               CASE WHEN cabinet THEN panel_name ELSE body_name END AS BodyName,
+               bool_or(is_panel OR cabinet) AS IsPanel,
+               sum(upheld)::bigint AS Upheld, sum(rejected)::bigint AS Rejected
+        FROM named
+        GROUP BY court_code, CASE WHEN cabinet THEN panel_name ELSE body_name END
+        ORDER BY court_code, BodyName NULLS LAST
         """;
 
     public async Task<ThemePanelCounts?> GetThemeAsync(long themeKey, CancellationToken cancellationToken)

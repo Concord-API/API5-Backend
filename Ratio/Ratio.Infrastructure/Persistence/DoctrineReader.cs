@@ -7,20 +7,26 @@ namespace Ratio.Infrastructure.Persistence;
 public sealed class DoctrineReader(NpgsqlDataSource dataSource) : IDoctrineReader
 {
     private const string Sql = """
-        SELECT d.title AS Title, d.authors AS Authors, d.journal_name AS Journal,
-               d.publication_year AS PublicationYear, d.doi AS Doi,
-               COALESCE('https://doi.org/' || d.doi, d.article_url) AS Link, d.source AS Source,
-               l.similarity::float8 AS Similarity, l.link_method AS LinkMethod, l.embedding_model AS EmbeddingModel
+        SELECT Title, Authors, Journal, PublicationYear, Doi, Link, Source, Similarity, LinkMethod, EmbeddingModel
         FROM (
-            SELECT DISTINCT ON (bsd.doctrine_sk) bsd.doctrine_sk, bsd.similarity, bsd.link_method, bsd.embedding_model
-            FROM dw.dim_theme t
-            JOIN dw.bridge_theme_subject bts ON bts.theme_sk = t.theme_sk
-            JOIN dw.bridge_subject_doctrine bsd ON bsd.subject_sk = bts.subject_sk
-            WHERE t.theme_key = @themeKey
-            ORDER BY bsd.doctrine_sk, bsd.similarity DESC NULLS LAST
-        ) l
-        JOIN dw.dim_doctrine d ON d.doctrine_sk = l.doctrine_sk
-        ORDER BY l.similarity DESC NULLS LAST, d.title
+            SELECT DISTINCT ON (lower(d.title), d.publication_year, lower(coalesce(d.authors, '')))
+                   d.title AS Title, d.authors AS Authors, d.journal_name AS Journal,
+                   d.publication_year AS PublicationYear, d.doi AS Doi,
+                   COALESCE('https://doi.org/' || d.doi, d.article_url) AS Link, d.source AS Source,
+                   l.similarity::float8 AS Similarity, l.link_method AS LinkMethod, l.embedding_model AS EmbeddingModel
+            FROM (
+                SELECT DISTINCT ON (bsd.doctrine_sk) bsd.doctrine_sk, bsd.similarity, bsd.link_method, bsd.embedding_model
+                FROM dw.dim_theme t
+                JOIN dw.bridge_theme_subject bts ON bts.theme_sk = t.theme_sk
+                JOIN dw.bridge_subject_doctrine bsd ON bsd.subject_sk = bts.subject_sk
+                WHERE t.theme_key = @themeKey
+                ORDER BY bsd.doctrine_sk, bsd.similarity DESC NULLS LAST
+            ) l
+            JOIN dw.dim_doctrine d ON d.doctrine_sk = l.doctrine_sk
+            ORDER BY lower(d.title), d.publication_year, lower(coalesce(d.authors, '')),
+                     l.similarity DESC NULLS LAST, d.doi NULLS LAST, d.doctrine_sk
+        ) unique_articles
+        ORDER BY Similarity DESC NULLS LAST, Title
         LIMIT @limit
         """;
 

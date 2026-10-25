@@ -8,7 +8,10 @@ public static class ProvenanceCatalog
     {
         ["datajud"] = ("DataJud/CNJ", "https://www.cnj.jus.br/sistemas/datajud/"),
         ["doaj"] = ("DOAJ", "https://doaj.org/"),
-        ["scielo"] = ("SciELO", "https://www.scielo.br/")
+        ["scielo"] = ("SciELO", "https://www.scielo.br/"),
+        ["oai_indexlaw"] = ("IndexLaw", "https://www.indexlaw.org/"),
+        ["oai_emerj"] = ("Revista da EMERJ", "https://ojs.emerj.com.br/index.php/revistadaemerj"),
+        ["oai_ejef_tjmg"] = ("Revista da EJEF (TJMG)", "https://revistaejef.tjmg.jus.br/index.php/revista-ejef")
     };
 
     public static Provenance Describe(LoadedProvenance loaded) =>
