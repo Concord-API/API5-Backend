@@ -21,6 +21,9 @@ public class ProvenanceCatalogTests
     [Theory]
     [InlineData("doaj", "DOAJ", "https://doaj.org/")]
     [InlineData("scielo", "SciELO", "https://www.scielo.br/")]
+    [InlineData("oai_indexlaw", "IndexLaw", "https://www.indexlaw.org/")]
+    [InlineData("oai_emerj", "Revista da EMERJ", "https://ojs.emerj.com.br/index.php/revistadaemerj")]
+    [InlineData("oai_ejef_tjmg", "Revista da EJEF (TJMG)", "https://revistaejef.tjmg.jus.br/index.php/revista-ejef")]
     public void Names_the_doctrine_sources(string code, string name, string url)
     {
         var provenance = ProvenanceCatalog.Describe(

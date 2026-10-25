@@ -152,4 +152,37 @@ public class DoctrineReaderTests(PostgresFixture postgres) : IClassFixture<Postg
     {
         Assert.Empty(await _reader.GetRelatedAsync(412, 20, CancellationToken.None));
     }
+
+    private Task AddCopyAsync(string title, string url, double similarity) =>
+        ExecuteAsync(
+            "INSERT INTO dw.dim_doctrine (title, authors, journal_name, publication_year, article_url, source, extracted_at) " +
+            $"VALUES ('{title}', 'Maria Silva', 'Revista da UFMG', 2012, '{url}', 'doaj', now()); " +
+            "INSERT INTO dw.bridge_subject_doctrine (subject_sk, doctrine_sk, link_method, similarity, embedding_model) " +
+            $"SELECT s.subject_sk, d.doctrine_sk, 'embedding_cosine+lexical', {Literal(similarity)}, '{Model}' " +
+            $"FROM dw.dim_subject s CROSS JOIN dw.dim_doctrine d WHERE s.subject_code = 1001 AND d.article_url = '{url}';");
+
+    [Fact]
+    public async Task Shows_an_article_published_at_several_addresses_once()
+    {
+        await AddCopyAsync("Reparação por dano moral", "https://web.example.org/article/13", 0.90);
+        await AddCopyAsync("Reparação por dano moral", "https://www.example.org/article/13", 0.90);
+        await AddCopyAsync("REPARAÇÃO POR DANO MORAL", "https://revista.example.org/article/13", 0.88);
+        await AddCopyAsync("Dano moral coletivo", "https://example.org/article/20", 0.80);
+
+        var entries = await _reader.GetRelatedAsync(412, 2, CancellationToken.None);
+
+        Assert.Equal(["Reparação por dano moral", "Dano moral coletivo"], entries.Select(entry => entry.Title));
+    }
+
+    [Fact]
+    public async Task Keeps_two_articles_with_the_same_title_from_different_years()
+    {
+        await AddCopyAsync("Dano moral", "https://example.org/article/1", 0.90);
+        await ExecuteAsync("UPDATE dw.dim_doctrine SET publication_year = 2020 WHERE article_url = 'https://example.org/article/1'");
+        await AddCopyAsync("Dano moral", "https://example.org/article/2", 0.85);
+
+        var entries = await _reader.GetRelatedAsync(412, 20, CancellationToken.None);
+
+        Assert.Equal(2, entries.Count(entry => entry.Title == "Dano moral"));
+    }
 }
