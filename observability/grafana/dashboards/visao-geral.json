@@ -364,7 +364,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "rpm",
+          "unit": "suffix: req/min",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -508,7 +508,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "rpm",
+          "unit": "suffix: req/min",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,

@@ -543,7 +543,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "rpm",
+          "unit": "suffix: req/min",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
