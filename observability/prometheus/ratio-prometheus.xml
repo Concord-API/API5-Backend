@@ -1,0 +1,22 @@
+<service>
+  <id>ratio-prometheus</id>
+  <name>Ratio Prometheus</name>
+  <description>Armazena as métricas do Ratio.</description>
+  <executable>%BASE%\prometheus.exe</executable>
+  <arguments>--config.file="%BASE%\prometheus.yml" --storage.tsdb.path="C:\ProgramData\Ratio\observability\prometheus\data" --storage.tsdb.retention.time=30d --web.listen-address=127.0.0.1:9090 --web.enable-remote-write-receiver</arguments>
+  <startmode>Automatic</startmode>
+  <stoptimeout>60 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>C:\ProgramData\Ratio\observability\prometheus\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+</service>

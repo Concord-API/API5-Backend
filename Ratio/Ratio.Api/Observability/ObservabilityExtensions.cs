@@ -1,3 +1,4 @@
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 
@@ -11,7 +12,8 @@ public static class ObservabilityExtensions
     [
         "Microsoft.AspNetCore.Hosting",
         "Microsoft.AspNetCore.Server.Kestrel",
-        "System.Runtime"
+        "System.Runtime",
+        WarehouseMetrics.MeterName
     ];
 
     public static Uri? ReadOtlpEndpoint(this IConfiguration configuration)
@@ -30,16 +32,22 @@ public static class ObservabilityExtensions
 
     public static IServiceCollection AddRatioObservability(this IServiceCollection services, Uri? otlpEndpoint)
     {
+        services.AddSingleton<SearchMetrics>();
         if (otlpEndpoint is null)
         {
             return services;
         }
 
+        services.AddSingleton<WarehouseMetrics>();
+        services.AddHostedService<WarehouseMetricsService>();
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(ServiceName))
             .WithMetrics(metrics => metrics
                 .AddMeter(Meters)
-                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint));
+                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
+            .WithLogging(
+                logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint),
+                options => options.IncludeFormattedMessage = true);
         return services;
     }
 }
