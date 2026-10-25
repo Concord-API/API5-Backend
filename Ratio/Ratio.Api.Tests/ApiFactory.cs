@@ -20,7 +20,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public Mock<IDoctrineReader> DoctrineReader { get; } = new();
     public Mock<IScopeReader> ScopeReader { get; } = new();
 
+    public Mock<ICourtCaseCountReader> CourtCaseCountReader { get; } = new();
+
+    public Mock<ICourtLevelReader> CourtLevelReader { get; } = new();
+
     public Mock<IPanelAlignmentReader> PanelAlignmentReader { get; } = new();
+
+    public Mock<IThemeCasesReader> ThemeCasesReader { get; } = new();
 
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
 
@@ -35,6 +41,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         new("TJSP", "Tribunal de Justiça de São Paulo", "SP")
     ];
 
+    public static IReadOnlyList<CourtCaseCount> CourtCaseCounts { get; } =
+    [
+        new("TJSP", "Tribunal de Justiça de São Paulo", 5412),
+        new("TJMG", "Tribunal de Justiça de Minas Gerais", 2108),
+        new("TJRJ", "Tribunal de Justiça do Rio de Janeiro", 0)
+    ];
+
+    public static IReadOnlyList<string> LoadedLevels { get; } = ["First", "Second"];
+
     public ApiFactory()
     {
         DatabaseMigrator.Setup(migrator => migrator.MigrateAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
@@ -42,6 +57,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         ProvenanceReader.Setup(reader => reader.GetThemeAsync(It.IsAny<long>(), It.IsAny<CancellationToken>())).ReturnsAsync(LoadedCases);
         DoctrineReader.Setup(reader => reader.GetRelatedAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         ScopeReader.Setup(reader => reader.GetCourtsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Courts);
+        CourtCaseCountReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(CourtCaseCounts);
+        CourtLevelReader.Setup(reader => reader.GetAsync(It.IsAny<CancellationToken>())).ReturnsAsync(LoadedLevels);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -56,7 +73,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(ProvenanceReader.Object);
             services.AddSingleton(DoctrineReader.Object);
             services.AddSingleton(ScopeReader.Object);
+            services.AddSingleton(CourtCaseCountReader.Object);
+            services.AddSingleton(CourtLevelReader.Object);
             services.AddSingleton(PanelAlignmentReader.Object);
+            services.AddSingleton(ThemeCasesReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);
         });

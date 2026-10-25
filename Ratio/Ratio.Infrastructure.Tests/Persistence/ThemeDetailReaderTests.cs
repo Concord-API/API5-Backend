@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using Ratio.Application.Abstractions;
 using Ratio.Infrastructure.Migrations;
 using Ratio.Infrastructure.Persistence;
 
@@ -93,11 +94,80 @@ public class ThemeDetailReaderTests(PostgresFixture postgres) : IClassFixture<Po
     }
 
     [Fact]
+    public async Task Withholds_the_grade_but_keeps_the_score_below_the_minimum_judged_cases()
+    {
+        await ExecuteAsync("UPDATE dw.strength_config SET min_judged_for_grade = 145");
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Null(detail.Level);
+        Assert.Equal(78, detail.StrengthScore);
+    }
+
+    [Fact]
+    public async Task Returns_the_grade_from_exactly_the_minimum_judged_cases()
+    {
+        await ExecuteAsync("UPDATE dw.strength_config SET min_judged_for_grade = 144");
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal("Dominante", detail.Level);
+    }
+
+    [Fact]
     public async Task Returns_a_null_summary_when_the_theme_has_no_narrative()
     {
         var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
 
         Assert.NotNull(detail);
         Assert.Null(detail.Summary);
+    }
+
+    [Fact]
+    public async Task Exposes_the_yearly_alignment_series_from_oldest_to_newest()
+    {
+        await ExecuteAsync("""
+            INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day)
+            VALUES (20230101, '2023-01-01', 2023, 1, 1, 'Janeiro', 1);
+            UPDATE dw.fact_case_event SET date_sk = 20230101
+            WHERE case_sk IN (SELECT case_sk FROM dw.dim_case ORDER BY case_sk LIMIT 2);
+            REFRESH MATERIALIZED VIEW dw.case_current_result;
+            REFRESH MATERIALIZED VIEW dw.theme_summary;
+            REFRESH MATERIALIZED VIEW dw.theme_strength;
+            REFRESH MATERIALIZED VIEW dw.theme_by_year;
+            """);
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.NotNull(detail);
+        Assert.Equal(
+            [
+                new YearlyAlignment(2023, 2, 1m, "acolhimento da pretensão do autor"),
+                new YearlyAlignment(2024, 142, 0.9859m, "acolhimento da pretensão do autor")
+            ],
+            detail.YearlyAlignments);
+    }
+
+    [Fact]
+    public async Task Exposes_the_yearly_trend_values_from_the_oldest_and_latest_years()
+    {
+        await ExecuteAsync("""
+            INSERT INTO dw.dim_date (date_sk, full_date, year, quarter, month, month_name, day)
+            VALUES (20230101, '2023-01-01', 2023, 1, 1, 'Janeiro', 1);
+            UPDATE dw.fact_case_event SET date_sk = 20230101
+            WHERE case_sk IN (SELECT case_sk FROM dw.dim_case ORDER BY case_sk LIMIT 2);
+            REFRESH MATERIALIZED VIEW dw.case_current_result;
+            REFRESH MATERIALIZED VIEW dw.theme_summary;
+            REFRESH MATERIALIZED VIEW dw.theme_strength;
+            REFRESH MATERIALIZED VIEW dw.theme_by_year;
+            """);
+
+        var detail = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.Equal(
+            new YearlyTrend(1m, 0.9859m, "acolhimento da pretensão do autor"),
+            detail!.YearlyTrend);
     }
 }

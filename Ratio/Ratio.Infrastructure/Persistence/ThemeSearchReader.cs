@@ -8,17 +8,21 @@ namespace Ratio.Infrastructure.Persistence;
 
 public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<ThemeSearchReader> logger) : IThemeSearchReader
 {
+    private const string FilterArguments =
+        "@courts::text[], @periodYears::integer, @levels::text[], @minStrength::integer";
+
     private const int MaxVisibleCourts = 3;
 
-    private static readonly string SearchSql = Sql("dw.search_themes(@query, @limit)");
+    private static readonly string SearchSql = Sql($"dw.search_themes(@query, @limit, {FilterArguments})");
 
-    private static readonly string TopSql = Sql("dw.top_themes(@limit)");
+    private static readonly string TopSql = Sql($"dw.top_themes(@limit, {FilterArguments})");
 
     private static string Sql(string source) => $"""
         SELECT s.theme_key AS ThemeKey, s.theme_name AS Name, s.subject_area AS SubjectArea,
                ts.judged AS Judged, ts.upheld AS Upheld, ts.rejected AS Rejected,
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
+               cfg.min_judged_for_grade AS MinJudgedForGrade,
                sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
                ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes, n.lead::text AS Lead
         FROM {source} s
@@ -39,11 +43,22 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         """;
 
     public Task<IReadOnlyList<ThemeSummary>> SearchThemesAsync(
-        string? query, int limit, CancellationToken cancellationToken) =>
-        QueryAsync(SearchSql, new { query, limit }, cancellationToken);
+        string? query, int limit, ThemeFilters filters, CancellationToken cancellationToken) =>
+        QueryAsync(SearchSql, Parameters(new { query, limit }, filters), cancellationToken);
 
-    public Task<IReadOnlyList<ThemeSummary>> TopThemesAsync(int limit, CancellationToken cancellationToken) =>
-        QueryAsync(TopSql, new { limit }, cancellationToken);
+    public Task<IReadOnlyList<ThemeSummary>> TopThemesAsync(
+        int limit, ThemeFilters filters, CancellationToken cancellationToken) =>
+        QueryAsync(TopSql, Parameters(new { limit }, filters), cancellationToken);
+
+    private static DynamicParameters Parameters(object template, ThemeFilters filters)
+    {
+        var parameters = new DynamicParameters(template);
+        parameters.Add("courts", filters.Courts?.ToArray());
+        parameters.Add("periodYears", filters.PeriodYears);
+        parameters.Add("levels", filters.Levels?.ToArray());
+        parameters.Add("minStrength", filters.MinStrength);
+        return parameters;
+    }
 
     private async Task<IReadOnlyList<ThemeSummary>> QueryAsync(
         string sql, object parameters, CancellationToken cancellationToken)
@@ -71,13 +86,14 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         var meetsFloor = row.MinJudgedForPercentage is not null && judged >= row.MinJudgedForPercentage;
         var hasMeritBasis = row.AgreementBasis == "pretensao_autor";
         var upheldRatio = meetsFloor && hasMeritBasis ? Math.Round((decimal)upheld / judged, 4) : (decimal?)null;
+        var level = row.MinJudgedForGrade is not null && judged >= row.MinJudgedForGrade ? row.Level : null;
 
         var lastDecisionDate = row.LastDecisionDate is null ? (DateOnly?)null : DateOnly.FromDateTime(row.LastDecisionDate.Value);
 
         var courts = row.CourtCodes?.Cast<string>().ToArray() ?? [];
 
         return new ThemeSummary(
-            row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, row.Level,
+            row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, level,
             new ThemeOutcome(upheld, rejected, upheldRatio, row.PolarityLabel),
             row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate)
         {
@@ -101,6 +117,7 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         int? StrengthScore,
         string? Level,
         short? MinJudgedForPercentage,
+        short? MinJudgedForGrade,
         short? PeriodStartYear,
         short? PeriodEndYear,
         string? AgreementBasis,

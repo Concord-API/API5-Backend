@@ -8,6 +8,7 @@ using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Filters;
 
 namespace Ratio.Api.Tests.Observability;
 
@@ -36,7 +37,7 @@ public class TelemetryContractTests
             .Setup(reader => reader.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(LastExtraction.At(DateTimeOffset.UtcNow.AddHours(-1)));
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync(SearchedText, 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync(SearchedText, 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         return factory.WithWebHostBuilder(builder => builder

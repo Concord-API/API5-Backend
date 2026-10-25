@@ -6,6 +6,7 @@ using Moq;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Filters;
 
 namespace Ratio.Api.Tests.Observability;
 
@@ -53,7 +54,7 @@ public class SearchMetricsTests
     {
         using var factory = new ApiFactory();
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("satelite", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("satelite", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var exported = await ExportAfterSearching(factory, "/api/themes?q=satelite");
@@ -66,7 +67,7 @@ public class SearchMetricsTests
     {
         using var factory = new ApiFactory();
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("satelite", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("satelite", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var exported = await ExportAfterSearching(factory, "/api/themes?q=satelite");
@@ -80,7 +81,7 @@ public class SearchMetricsTests
     {
         using var factory = new ApiFactory();
         factory.ThemeSearchReader
-            .Setup(reader => reader.SearchThemesAsync("inscricao", 20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.SearchThemesAsync("inscricao", 20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([WrongfulListing]);
 
         var exported = await ExportAfterSearching(factory, "/api/themes?q=inscricao");
@@ -93,7 +94,7 @@ public class SearchMetricsTests
     {
         using var factory = new ApiFactory();
         factory.ThemeSearchReader
-            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<CancellationToken>()))
+            .Setup(reader => reader.TopThemesAsync(20, It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
         var exported = await ExportAfterSearching(factory, "/api/themes");
