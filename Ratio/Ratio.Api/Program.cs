@@ -16,7 +16,6 @@ if (WindowsServiceHelpers.IsWindowsService())
 }
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Logging.ClearProviders();
 
 string connectionString;
 string[] allowedOrigins;
@@ -37,10 +36,7 @@ using (var startupLogger = new LoggerConfiguration().ReadFrom.Configuration(buil
     }
 }
 
-builder.Host.UseWindowsService();
-builder.Host.UseSerilog((context, logger) => logger
-    .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext(), writeToProviders: true);
+builder.UseRatioLogging(host => host.UseWindowsService());
 
 builder.Services.AddControllers(options =>
 {
