@@ -16,7 +16,9 @@ public class PanelCabinetTests(PostgresFixture postgres) : IClassFixture<Postgre
         "('C-4', 239, '26ª Câmara de Direito Privado'), " +
         "('C-5', 239, 'Gabinete 03 - 1ª Câmara Reservada de Direito Empresarial'), " +
         "('C-6', 239, 'Gab. da Presidência'), " +
-        "('C-7', 239, 'GAB DES FULANO DE TAL')) AS seed(case_number, movement_code, body_name)";
+        "('C-7', 239, 'GAB DES FULANO DE TAL'), " +
+        "('C-8', 237, 'Gabinete da 5ª Câmara Cível'), " +
+        "('C-9', 239, 'Gabinete da 1ª Vice-Presidência')) AS seed(case_number, movement_code, body_name)";
 
     private const string WarehouseData =
         "INSERT INTO dw.dim_decision_outcome (outcome_code, outcome_label, counts_in_metric) VALUES " +
@@ -74,6 +76,7 @@ public class PanelCabinetTests(PostgresFixture postgres) : IClassFixture<Postgre
 
         Assert.Contains(new JudgingBodyCount("TJSP", "26ª Câmara de Direito Privado", true, 2, 2), bodies);
         Assert.Contains(new JudgingBodyCount("TJSP", "1ª Câmara Reservada de Direito Empresarial", true, 0, 1), bodies);
+        Assert.Contains(new JudgingBodyCount("TJSP", "5ª Câmara Cível", true, 1, 0), bodies);
     }
 
     [Fact]
@@ -83,6 +86,7 @@ public class PanelCabinetTests(PostgresFixture postgres) : IClassFixture<Postgre
 
         Assert.Contains(new JudgingBodyCount("TJSP", "Gab. da Presidência", false, 0, 1), bodies);
         Assert.Contains(new JudgingBodyCount("TJSP", "GAB DES FULANO DE TAL", false, 0, 1), bodies);
+        Assert.Contains(new JudgingBodyCount("TJSP", "Gabinete da 1ª Vice-Presidência", false, 0, 1), bodies);
     }
 
     [Fact]
@@ -90,7 +94,7 @@ public class PanelCabinetTests(PostgresFixture postgres) : IClassFixture<Postgre
     {
         var bodies = await BodiesAsync();
 
-        Assert.Equal(7, bodies.Sum(body => body.Upheld + body.Rejected));
-        Assert.Equal(4, bodies.Length);
+        Assert.Equal(9, bodies.Sum(body => body.Upheld + body.Rejected));
+        Assert.Equal(6, bodies.Length);
     }
 }
