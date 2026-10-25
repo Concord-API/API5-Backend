@@ -63,6 +63,7 @@ public class ThemeProvenanceTests(PostgresFixture postgres) : IClassFixture<Post
 
     private async Task<ThemeProvenanceRow[]> ReadProvenanceAsync(long themeKey)
     {
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_provenance");
         await using var connection = _dataSource.CreateConnection();
         return (await connection.QueryAsync<ThemeProvenanceRow>(
             "SELECT p.block AS Block, p.source AS Source, p.extracted_at AS ExtractedAt, p.row_count AS RowCount, " +
