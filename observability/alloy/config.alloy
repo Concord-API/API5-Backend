@@ -54,3 +54,18 @@ prometheus.scrape "api_health" {
   scrape_interval = "1m"
   scrape_timeout  = "10s"
 }
+
+prometheus.exporter.windows "host" {
+  enabled_collectors = ["cpu", "logical_disk", "memory", "net", "os", "service", "system", "iis"]
+
+  service {
+    include = "ratio-.*|postgresql.*|Alloy|Grafana|W3SVC|WAS"
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.windows.host.targets
+  forward_to      = [prometheus.remote_write.local.receiver]
+  scrape_interval = "1m"
+  scrape_timeout  = "30s"
+}
