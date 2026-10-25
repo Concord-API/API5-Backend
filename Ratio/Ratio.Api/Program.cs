@@ -36,10 +36,7 @@ using (var startupLogger = new LoggerConfiguration().ReadFrom.Configuration(buil
     }
 }
 
-builder.Host.UseWindowsService();
-builder.Host.UseSerilog((context, logger) => logger
-    .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext());
+builder.UseRatioLogging(host => host.UseWindowsService());
 
 builder.Services.AddControllers(options =>
 {
@@ -75,8 +72,8 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(connectionString);
-builder.Services.AddRatioObservability(otlpEndpoint);
 builder.Services.AddHostedService<DatabaseMigrationService>();
+builder.Services.AddRatioObservability(otlpEndpoint);
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context => ProblemDetailsTitles.Localize(context.ProblemDetails));
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
