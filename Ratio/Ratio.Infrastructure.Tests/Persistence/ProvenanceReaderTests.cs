@@ -66,6 +66,8 @@ public class ProvenanceReaderTests(PostgresFixture postgres) : IClassFixture<Pos
     [Fact]
     public async Task Reads_the_provenance_of_one_theme()
     {
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_provenance");
+
         var provenance = await _reader.GetThemeAsync(413, CancellationToken.None);
 
         var cases = Assert.Single(provenance.Sources);
