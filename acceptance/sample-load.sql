@@ -98,6 +98,7 @@ REFRESH MATERIALIZED VIEW dw.case_current_result;
 REFRESH MATERIALIZED VIEW dw.theme_summary;
 REFRESH MATERIALIZED VIEW dw.theme_strength;
 REFRESH MATERIALIZED VIEW dw.theme_outcome_distribution;
+REFRESH MATERIALIZED VIEW dw.theme_appeal_by_instance;
 REFRESH MATERIALIZED VIEW dw.data_provenance;
 REFRESH MATERIALIZED VIEW dw.theme_provenance;
 REFRESH MATERIALIZED VIEW dw.theme_by_court;

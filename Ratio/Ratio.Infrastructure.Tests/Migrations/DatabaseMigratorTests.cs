@@ -13,6 +13,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
     [
         "bridge_case_subject",
         "bridge_subject_doctrine",
+        "bridge_subject_precedent",
         "bridge_theme_subject",
         "dim_case",
         "dim_case_class",
@@ -22,6 +23,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "dim_doctrine",
         "dim_judging_body",
         "dim_movement",
+        "dim_precedent",
         "dim_subject",
         "dim_theme",
         "fact_case_event",
@@ -30,7 +32,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "theme_narrative"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "data_provenance", "theme_by_court", "theme_by_judging_body", "theme_by_year", "theme_court_activity", "theme_outcome_distribution", "theme_provenance", "theme_strength", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "data_provenance", "theme_appeal_by_instance", "theme_by_court", "theme_by_judging_body", "theme_by_year", "theme_court_activity", "theme_outcome_distribution", "theme_provenance", "theme_strength", "theme_summary"];
 
     private static readonly string[] Scripts =
     [
@@ -56,7 +58,9 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V019__theme_court_activity.sql",
         "V020__theme_by_year.sql",
         "V021__theme_case_sample.sql",
-        "V022__materialize_theme_provenance.sql"
+        "V022__materialize_theme_provenance.sql",
+        "V023__stj_precedents.sql",
+        "V024__theme_appeal_by_instance.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
