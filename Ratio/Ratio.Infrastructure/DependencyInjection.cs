@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddSingleton<ICourtLevelReader, CourtLevelReader>();
         services.AddSingleton<IPanelAlignmentReader, PanelAlignmentReader>();
         services.AddSingleton<IThemeCasesReader, ThemeCasesReader>();
+        services.AddSingleton<IPrecedentReader, PrecedentReader>();
         services.AddSingleton<IDatabaseMigrator>(provider =>
             new DatabaseMigrator(connectionString, provider.GetRequiredService<ILogger<DatabaseMigrator>>()));
         return services;
