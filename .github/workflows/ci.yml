@@ -161,6 +161,7 @@ jobs:
           /d:sonar.token="$SONAR_TOKEN"
           /d:sonar.cs.opencover.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/coverage.opencover.xml"
           /d:sonar.cs.vstest.reportsPaths="$GITHUB_WORKSPACE/QualityResults/**/*.trx"
+          /d:sonar.cpd.exclusions="**/Migrations/Scripts/*.sql"
           /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
           $SONAR_VERSION_ARG
