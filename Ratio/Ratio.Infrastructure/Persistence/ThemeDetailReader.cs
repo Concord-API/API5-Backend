@@ -31,13 +31,25 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
                END AS PolarityLabel,
                d.judged_count AS Judged, d.upheld_count AS Upheld,
                d.partially_upheld_count AS PartiallyUpheld, d.rejected_count AS Rejected,
-               cfg.min_judged_for_percentage AS MinJudgedForPercentage
+               cfg.min_judged_for_percentage AS MinJudgedForPercentage, d.polarity_reference AS Polarity
         FROM dw.theme_outcome_distribution d
         JOIN dw.dim_theme t ON t.theme_sk = d.theme_sk
         JOIN dw.theme_summary s ON s.theme_sk = d.theme_sk
         LEFT JOIN dw.strength_config cfg ON cfg.id = 1
         WHERE t.theme_key = @themeKey
         ORDER BY d.polarity_reference
+        """;
+
+    private const string AppealInstanceSql = """
+        SELECT 'acolhimento da pretensão de quem recorreu' AS PolarityLabel,
+               a.judged_count AS Judged, a.upheld_count AS Upheld,
+               a.partially_upheld_count AS PartiallyUpheld, a.rejected_count AS Rejected,
+               cfg.min_judged_for_percentage AS MinJudgedForPercentage, a.instance AS Polarity
+        FROM dw.theme_appeal_by_instance a
+        JOIN dw.dim_theme t ON t.theme_sk = a.theme_sk
+        LEFT JOIN dw.strength_config cfg ON cfg.id = 1
+        WHERE t.theme_key = @themeKey
+        ORDER BY CASE a.instance WHEN 'state' THEN 0 ELSE 1 END
         """;
 
     private const string CourtAlignmentSql = """
@@ -113,7 +125,7 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
 
             return Map(row) with
             {
-                OutcomeBreakdown = breakdown.Select(MapBreakdown).ToArray(),
+                OutcomeBreakdown = await SplitAppealsAsync(connection, themeKey, breakdown.AsList(), cancellationToken),
                 CourtAlignments = courtAlignments.Select(alignment => WithActivity(MapCourtAlignment(alignment), activity)).ToArray(),
                 YearlyAlignments = yearlyAlignments.Select(MapYearlyAlignment).ToArray(),
                 YearlyTrend = MapYearlyTrend(yearlyAlignments)
@@ -150,6 +162,39 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
                 row.TextOrigin!,
                 row.MethodologyVersion!,
                 DateOnly.FromDateTime(row.GeneratedAt!.Value));
+
+    private static async Task<IReadOnlyList<OutcomeBreakdown>> SplitAppealsAsync(
+        NpgsqlConnection connection, long themeKey, List<BreakdownRow> rows, CancellationToken cancellationToken)
+    {
+        var families = rows.Select(MapBreakdown).ToList();
+        var appealIndex = rows.FindIndex(row => row.Polarity == "pretensao_recorrente");
+
+        if (appealIndex < 0)
+        {
+            return families;
+        }
+
+        try
+        {
+            var instances = (await connection.QueryAsync<BreakdownRow>(
+                new CommandDefinition(AppealInstanceSql, new { themeKey }, cancellationToken: cancellationToken))).AsList();
+
+            if (instances.Count == 0)
+            {
+                return families;
+            }
+
+            families.RemoveAt(appealIndex);
+            families.InsertRange(
+                appealIndex,
+                instances.Select(row => MapBreakdown(row) with { Instance = row.Polarity }));
+            return families;
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+        {
+            return families;
+        }
+    }
 
     private static OutcomeBreakdown MapBreakdown(BreakdownRow row)
     {
@@ -265,7 +310,8 @@ public sealed class ThemeDetailReader(NpgsqlDataSource dataSource, ILogger<Theme
         long Upheld,
         long PartiallyUpheld,
         long Rejected,
-        short? MinJudgedForPercentage);
+        short? MinJudgedForPercentage,
+        string Polarity);
 
     private sealed record CourtActivityRow(string CourtCode, long Decisions, DateTime? LastDecisionDate);
 

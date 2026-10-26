@@ -32,7 +32,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "theme_narrative"
     ];
 
-    private static readonly string[] MaterializedViews = ["case_current_result", "data_provenance", "theme_by_court", "theme_by_judging_body", "theme_by_year", "theme_court_activity", "theme_outcome_distribution", "theme_provenance", "theme_strength", "theme_summary"];
+    private static readonly string[] MaterializedViews = ["case_current_result", "data_provenance", "theme_appeal_by_instance", "theme_by_court", "theme_by_judging_body", "theme_by_year", "theme_court_activity", "theme_outcome_distribution", "theme_provenance", "theme_strength", "theme_summary"];
 
     private static readonly string[] Scripts =
     [
@@ -59,7 +59,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V020__theme_by_year.sql",
         "V021__theme_case_sample.sql",
         "V022__materialize_theme_provenance.sql",
-        "V023__stj_precedents.sql"
+        "V023__stj_precedents.sql",
+        "V024__theme_appeal_by_instance.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
