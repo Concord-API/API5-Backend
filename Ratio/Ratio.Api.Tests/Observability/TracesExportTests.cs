@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -37,18 +38,11 @@ public class TracesExportTests
         factory.ThemeSearchReader
             .Setup(reader => reader.SearchThemesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
-        using var configured = factory.WithWebHostBuilder(builder => builder
-            .UseSetting("OpenTelemetry:Endpoint", "http://127.0.0.1:4317")
-            .ConfigureTestServices(services =>
-                services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(exported))));
+        using var configured = Configured(factory, exported);
 
-        var traceId = ActivityTraceId.CreateRandom();
-        var client = configured.CreateClient();
-        client.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
-        await client.GetAsync("/api/themes?q=juros");
+        var traceId = await GetWithTraceAsync(configured, "/api/themes?q=juros");
         var provider = configured.Services.GetRequiredService<TracerProvider>();
-
-        var span = await WaitForSpanAsync(provider, exported, traceId);
+        var span = await WaitForSpanAsync(provider, exported, traceId, TimeSpan.FromSeconds(5));
 
         Assert.NotNull(span);
         Assert.Equal("api/themes", span.GetTagItem("http.route"));
@@ -57,9 +51,63 @@ public class TracesExportTests
             attribute.Key == "service.name" && attribute.Value as string == "ratio-api");
     }
 
-    private static async Task<Activity?> WaitForSpanAsync(TracerProvider provider, List<Activity> exported, ActivityTraceId traceId)
+    [Fact]
+    public async Task Keeps_the_search_text_out_of_the_request_span()
     {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
+        const string searchedText = "satelite";
+        var exported = new List<Activity>();
+        using var factory = new ApiFactory();
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var configured = Configured(factory, exported);
+
+        var traceId = await GetWithTraceAsync(configured, $"/api/themes?q={searchedText}");
+        var provider = configured.Services.GetRequiredService<TracerProvider>();
+        var span = await WaitForSpanAsync(provider, exported, traceId, TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(span);
+        Assert.DoesNotContain(searchedText, span.DisplayName);
+        Assert.DoesNotContain(span.TagObjects, tag => tag.Value?.ToString()?.Contains(searchedText) == true);
+    }
+
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/health/ready")]
+    public async Task Leaves_the_health_endpoints_out_of_traces(string path)
+    {
+        var exported = new List<Activity>();
+        using var factory = new ApiFactory();
+        factory.LastExtractionReader
+            .Setup(reader => reader.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LastExtraction.At(DateTimeOffset.UtcNow.AddHours(-1)));
+        using var configured = Configured(factory, exported);
+
+        var traceId = await GetWithTraceAsync(configured, path);
+        var provider = configured.Services.GetRequiredService<TracerProvider>();
+
+        Assert.Null(await WaitForSpanAsync(provider, exported, traceId, TimeSpan.FromSeconds(1)));
+    }
+
+    private static WebApplicationFactory<Program> Configured(ApiFactory factory, List<Activity> exported) =>
+        factory.WithWebHostBuilder(builder => builder
+            .UseSetting("OpenTelemetry:Endpoint", "http://127.0.0.1:4317")
+            .ConfigureTestServices(services =>
+                services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(exported))));
+
+    private static async Task<ActivityTraceId> GetWithTraceAsync(WebApplicationFactory<Program> api, string path)
+    {
+        var traceId = ActivityTraceId.CreateRandom();
+        var client = api.CreateClient();
+        client.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
+        await client.GetAsync(path);
+        return traceId;
+    }
+
+    private static async Task<Activity?> WaitForSpanAsync(
+        TracerProvider provider, List<Activity> exported, ActivityTraceId traceId, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow.Add(timeout);
         while (DateTime.UtcNow < deadline)
         {
             provider.ForceFlush();
