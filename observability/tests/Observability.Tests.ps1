@@ -80,6 +80,66 @@ Describe 'artifacts.json' {
     }
 }
 
+Describe 'tempo.yml' {
+    BeforeAll {
+        $path = Join-Path $PSScriptRoot '..' 'tempo' 'tempo.yml'
+        $config = if (Test-Path -Path $path) { Get-Content -Path $path -Raw } else { '' }
+    }
+
+    It 'escuta só em 127.0.0.1 com <Key>' -TestCases @(
+        @{ Key = 'http_listen_address'; Value = '127.0.0.1' },
+        @{ Key = 'http_listen_port'; Value = '3200' },
+        @{ Key = 'grpc_listen_address'; Value = '127.0.0.1' },
+        @{ Key = 'grpc_listen_port'; Value = '9097' }
+    ) {
+        $config | Should -Match "(?m)^\s+$Key\s*:\s*$([regex]::Escape($Value))\s*$"
+    }
+
+    It 'recebe os traces do Alloy por OTLP em 127.0.0.1:4417' {
+        $config | Should -Match '(?m)^\s+endpoint\s*:\s*127\.0\.0\.1:4417\s*$'
+    }
+
+    It 'guarda os traces por 15 dias no agendador e no worker' {
+        [regex]::Matches($config, '(?m)^\s+block_retention\s*:\s*360h\s*$').Count | Should -Be 2
+    }
+
+    It 'grava os dados na pasta de TEMPO_DATA_DIR' {
+        $config | Should -Match '(?m)^\s+path\s*:\s*\$\{TEMPO_DATA_DIR\}/wal\s*$'
+        $config | Should -Match '(?m)^\s+path\s*:\s*\$\{TEMPO_DATA_DIR\}/blocks\s*$'
+    }
+
+    It 'não manda estatística de uso, que depende da internet' {
+        $config | Should -Match '(?m)^\s+reporting_enabled\s*:\s*false\s*$'
+    }
+}
+
+Describe 'ratio-tempo.xml' {
+    BeforeAll {
+        $path = Join-Path $PSScriptRoot '..' 'tempo' 'ratio-tempo.xml'
+        $service = if (Test-Path -Path $path) { ([xml] (Get-Content -Path $path -Raw)).service } else { $null }
+    }
+
+    It 'registra o serviço ratio-tempo' {
+        $service.id | Should -Be 'ratio-tempo'
+    }
+
+    It 'roda o Tempo com a configuração ao lado, expandindo as variáveis' {
+        $service.executable | Should -Be '%BASE%\tempo.exe'
+        $service.arguments | Should -Be '-config.file="%BASE%\tempo.yml" -config.expand-env=true'
+    }
+
+    It 'grava os dados em ProgramData' {
+        $dataDir = $service.env | Where-Object { $_.name -eq 'TEMPO_DATA_DIR' }
+        $dataDir.value | Should -Be 'C:\ProgramData\Ratio\observability\tempo\data'
+    }
+
+    It 'roda como Serviço Local e sobe com o Windows' {
+        $service.serviceaccount.domain | Should -Be 'NT AUTHORITY'
+        $service.serviceaccount.user | Should -Be 'LocalService'
+        $service.startmode | Should -Be 'Automatic'
+    }
+}
+
 Describe 'custom.ini' {
     BeforeAll {
         $settings = @{}
