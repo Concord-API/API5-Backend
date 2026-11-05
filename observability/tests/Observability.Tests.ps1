@@ -68,8 +68,8 @@ Describe 'artifacts.json' {
         $manifest = Get-ObservabilityManifest -Path (Join-Path $PSScriptRoot '..' 'artifacts.json')
     }
 
-    It 'lista os cinco componentes da stack' {
-        $manifest.name | Sort-Object | Should -Be @('alloy', 'grafana', 'loki', 'prometheus', 'winsw')
+    It 'lista os seis componentes da stack' {
+        $manifest.name | Sort-Object | Should -Be @('alloy', 'grafana', 'loki', 'prometheus', 'tempo', 'winsw')
     }
 
     It 'traz URL https e SHA256 de 64 caracteres para cada artefato' {
