@@ -390,6 +390,29 @@ Describe 'Invoke-Installer' {
     }
 }
 
+Describe 'Expand-TarArchive' {
+    BeforeEach {
+        $source = Join-Path $TestDrive ([guid]::NewGuid())
+        New-Item -ItemType Directory -Path $source | Out-Null
+        Set-Content -Path (Join-Path $source 'tempo.exe') -Value 'binário' -NoNewline
+        $archive = Join-Path $TestDrive "$([guid]::NewGuid()).tar.gz"
+        & tar -czf $archive -C $source 'tempo.exe'
+        $destination = Join-Path $TestDrive ([guid]::NewGuid())
+    }
+
+    It 'extrai o tar.gz na pasta de destino, criando a pasta' {
+        Expand-TarArchive -Path $archive -DestinationPath $destination
+
+        Get-Content -Path (Join-Path $destination 'tempo.exe') -Raw | Should -Be 'binário'
+    }
+
+    It 'recusa o arquivo que não é tar.gz, citando o arquivo' {
+        $broken = New-Artifact 'quebrado.tar.gz' 'não é tar'
+
+        { Expand-TarArchive -Path $broken -DestinationPath $destination } | Should -Throw '*quebrado.tar.gz*'
+    }
+}
+
 Describe 'Add-PreloadLibrary' {
     It 'usa só o pg_stat_statements quando nada é pré-carregado' {
         Add-PreloadLibrary -Current '' -Library 'pg_stat_statements' | Should -Be 'pg_stat_statements'
