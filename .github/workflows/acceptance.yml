@@ -70,6 +70,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/ratio/package-lock.json
 
+      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1
+        with:
+          k6-version: 2.3.0
+
       - name: Install PostgreSQL for Windows
         run: |
           $zip = Join-Path $env:RUNNER_TEMP 'postgresql.zip'
@@ -191,6 +195,13 @@ jobs:
           CONTRACT_API_URL: http://127.0.0.1:8080
         run: |
           npm run test:contract
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Run the load test
+        env:
+          BASE_URL: http://127.0.0.1:8080
+        run: |
+          k6 run backend/acceptance/k6/load.ts
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Collect the logs
