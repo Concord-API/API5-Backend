@@ -68,8 +68,8 @@ Describe 'artifacts.json' {
         $manifest = Get-ObservabilityManifest -Path (Join-Path $PSScriptRoot '..' 'artifacts.json')
     }
 
-    It 'lista os cinco componentes da stack' {
-        $manifest.name | Sort-Object | Should -Be @('alloy', 'grafana', 'loki', 'prometheus', 'winsw')
+    It 'lista os seis componentes da stack' {
+        $manifest.name | Sort-Object | Should -Be @('alloy', 'grafana', 'loki', 'prometheus', 'tempo', 'winsw')
     }
 
     It 'traz URL https e SHA256 de 64 caracteres para cada artefato' {
@@ -77,6 +77,88 @@ Describe 'artifacts.json' {
             $artifact.url | Should -Match '^https://'
             $artifact.sha256 | Should -Match '^[0-9a-f]{64}$'
         }
+    }
+}
+
+Describe 'tempo.yml' {
+    BeforeAll {
+        $path = Join-Path $PSScriptRoot '..' 'tempo' 'tempo.yml'
+        $config = if (Test-Path -Path $path) { Get-Content -Path $path -Raw } else { '' }
+    }
+
+    It 'escuta só em 127.0.0.1 com <Key>' -TestCases @(
+        @{ Key = 'http_listen_address'; Value = '127.0.0.1' },
+        @{ Key = 'http_listen_port'; Value = '3200' },
+        @{ Key = 'grpc_listen_address'; Value = '127.0.0.1' },
+        @{ Key = 'grpc_listen_port'; Value = '9097' }
+    ) {
+        $config | Should -Match "(?m)^\s+$Key\s*:\s*$([regex]::Escape($Value))\s*$"
+    }
+
+    It 'recebe os traces do Alloy por OTLP em 127.0.0.1:4417' {
+        $config | Should -Match '(?m)^\s+endpoint\s*:\s*127\.0\.0\.1:4417\s*$'
+    }
+
+    It 'guarda os traces por 15 dias no agendador e no worker' {
+        [regex]::Matches($config, '(?m)^\s+block_retention\s*:\s*360h\s*$').Count | Should -Be 2
+    }
+
+    It 'grava os dados na pasta de TEMPO_DATA_DIR' {
+        $config | Should -Match '(?m)^\s+path\s*:\s*\$\{TEMPO_DATA_DIR\}/wal\s*$'
+        $config | Should -Match '(?m)^\s+path\s*:\s*\$\{TEMPO_DATA_DIR\}/blocks\s*$'
+    }
+
+    It 'não manda estatística de uso, que depende da internet' {
+        $config | Should -Match '(?m)^\s+reporting_enabled\s*:\s*false\s*$'
+    }
+}
+
+Describe 'config.alloy' {
+    BeforeAll {
+        $config = Get-Content -Path (Join-Path $PSScriptRoot '..' 'alloy' 'config.alloy') -Raw
+    }
+
+    It 'recebe os traces da API e os manda para o lote' {
+        $receiver = [regex]::Match($config, '(?s)otelcol\.receiver\.otlp "api" \{.*?\n\}').Value
+        $receiver | Should -Match 'traces\s*=\s*\[otelcol\.processor\.batch\.default\.input\]'
+    }
+
+    It 'manda os traces do lote para o Tempo' {
+        $batch = [regex]::Match($config, '(?s)otelcol\.processor\.batch "default" \{.*?\n\}').Value
+        $batch | Should -Match 'traces\s*=\s*\[otelcol\.exporter\.otlp\.tempo\.input\]'
+    }
+
+    It 'entrega ao Tempo em 127.0.0.1:4417, sem TLS' {
+        $exporter = [regex]::Match($config, '(?s)otelcol\.exporter\.otlp "tempo" \{.*?\n\}').Value
+        $exporter | Should -Match 'endpoint\s*=\s*"127\.0\.0\.1:4417"'
+        $exporter | Should -Match 'insecure\s*=\s*true'
+    }
+}
+
+Describe 'ratio-tempo.xml' {
+    BeforeAll {
+        $path = Join-Path $PSScriptRoot '..' 'tempo' 'ratio-tempo.xml'
+        $service = if (Test-Path -Path $path) { ([xml] (Get-Content -Path $path -Raw)).service } else { $null }
+    }
+
+    It 'registra o serviço ratio-tempo' {
+        $service.id | Should -Be 'ratio-tempo'
+    }
+
+    It 'roda o Tempo com a configuração ao lado, expandindo as variáveis' {
+        $service.executable | Should -Be '%BASE%\tempo.exe'
+        $service.arguments | Should -Be '-config.file="%BASE%\tempo.yml" -config.expand-env=true'
+    }
+
+    It 'grava os dados em ProgramData' {
+        $dataDir = $service.env | Where-Object { $_.name -eq 'TEMPO_DATA_DIR' }
+        $dataDir.value | Should -Be 'C:\ProgramData\Ratio\observability\tempo\data'
+    }
+
+    It 'roda como Serviço Local e sobe com o Windows' {
+        $service.serviceaccount.domain | Should -Be 'NT AUTHORITY'
+        $service.serviceaccount.user | Should -Be 'LocalService'
+        $service.startmode | Should -Be 'Automatic'
     }
 }
 
@@ -327,6 +409,29 @@ Describe 'Invoke-Installer' {
 
         { Invoke-Installer -Name 'Grafana' -FilePath 'msiexec.exe' -ArgumentList '/i', 'grafana.msi', '/qn' } |
             Should -Throw '*Grafana*1603*'
+    }
+}
+
+Describe 'Expand-TarArchive' {
+    BeforeEach {
+        $source = Join-Path $TestDrive ([guid]::NewGuid())
+        New-Item -ItemType Directory -Path $source | Out-Null
+        Set-Content -Path (Join-Path $source 'tempo.exe') -Value 'binário' -NoNewline
+        $archive = Join-Path $TestDrive "$([guid]::NewGuid()).tar.gz"
+        & tar -czf $archive -C $source 'tempo.exe'
+        $destination = Join-Path $TestDrive ([guid]::NewGuid())
+    }
+
+    It 'extrai o tar.gz na pasta de destino, criando a pasta' {
+        Expand-TarArchive -Path $archive -DestinationPath $destination
+
+        Get-Content -Path (Join-Path $destination 'tempo.exe') -Raw | Should -Be 'binário'
+    }
+
+    It 'recusa o arquivo que não é tar.gz, citando o arquivo' {
+        $broken = New-Artifact 'quebrado.tar.gz' 'não é tar'
+
+        { Expand-TarArchive -Path $broken -DestinationPath $destination } | Should -Throw '*quebrado.tar.gz*'
     }
 }
 

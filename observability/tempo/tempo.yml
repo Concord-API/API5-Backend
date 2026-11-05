@@ -1,0 +1,35 @@
+stream_over_http_enabled: true
+
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3200
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 9097
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 127.0.0.1:4417
+
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: 360h
+
+backend_worker:
+  compaction:
+    block_retention: 360h
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: ${TEMPO_DATA_DIR}/wal
+    local:
+      path: ${TEMPO_DATA_DIR}/blocks
+
+usage_report:
+  reporting_enabled: false

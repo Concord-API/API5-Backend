@@ -125,6 +125,20 @@ function Invoke-Installer {
     }
 }
 
+function Expand-TarArchive {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string] $DestinationPath
+    )
+
+    New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+    $process = Start-Process -FilePath 'tar' -ArgumentList '-xzf', "`"$Path`"", '-C', "`"$DestinationPath`"" -Wait -PassThru -NoNewWindow
+    if ($process.ExitCode -ne 0) {
+        throw "Não foi possível extrair '$(Split-Path -Leaf $Path)' (tar terminou com $($process.ExitCode))."
+    }
+}
+
 function Add-PreloadLibrary {
     [CmdletBinding()]
     param(
@@ -266,4 +280,4 @@ function Set-ServiceEnvironment {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment

@@ -1,0 +1,23 @@
+<service>
+  <id>ratio-tempo</id>
+  <name>Ratio Tempo</name>
+  <description>Armazena e pesquisa os traces do Ratio.</description>
+  <executable>%BASE%\tempo.exe</executable>
+  <arguments>-config.file="%BASE%\tempo.yml" -config.expand-env=true</arguments>
+  <env name="TEMPO_DATA_DIR" value="C:\ProgramData\Ratio\observability\tempo\data" />
+  <startmode>Automatic</startmode>
+  <stoptimeout>60 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>C:\ProgramData\Ratio\observability\tempo\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+</service>
