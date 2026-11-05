@@ -47,7 +47,8 @@ public static class ObservabilityExtensions
                 .AddMeter(Meters)
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
             .WithTracing(tracing => tracing
-                .AddAspNetCoreInstrumentation()
+                .AddAspNetCoreInstrumentation(options =>
+                    options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
             .WithLogging(
                 logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint),
