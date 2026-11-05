@@ -47,6 +47,7 @@ public static class ObservabilityExtensions
                 .AddMeter(Meters)
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
             .WithTracing(tracing => tracing
+                .SetSampler(new ParentBasedSampler(new RequestRootSampler()))
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
                 .AddSource("Npgsql")
