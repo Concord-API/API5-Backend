@@ -60,6 +60,15 @@ public class DatabaseTracesTests(PostgresFixture postgres) : IClassFixture<Postg
             Assert.DoesNotContain(span.TagObjects, tag => tag.Value?.ToString()?.Contains(SearchedText) == true));
     }
 
+    [Fact]
+    public async Task Drops_the_database_commands_that_no_request_started()
+    {
+        await SearchWithTraceAsync();
+
+        Assert.DoesNotContain(_exported.ToArray(), span =>
+            span.Source.Name == "Npgsql" && span.ParentSpanId == default);
+    }
+
     private async Task<List<Activity>> SearchWithTraceAsync()
     {
         var traceId = ActivityTraceId.CreateRandom();
