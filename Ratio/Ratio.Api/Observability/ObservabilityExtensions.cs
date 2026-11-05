@@ -1,6 +1,7 @@
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace Ratio.Api.Observability;
 
@@ -44,6 +45,9 @@ public static class ObservabilityExtensions
             .ConfigureResource(resource => resource.AddService(ServiceName))
             .WithMetrics(metrics => metrics
                 .AddMeter(Meters)
+                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
+            .WithTracing(tracing => tracing
+                .AddAspNetCoreInstrumentation()
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
             .WithLogging(
                 logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint),
