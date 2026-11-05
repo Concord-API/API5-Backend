@@ -51,6 +51,26 @@ public class TracesExportTests
             attribute.Key == "service.name" && attribute.Value as string == "ratio-api");
     }
 
+    [Fact]
+    public async Task Keeps_the_search_text_out_of_the_request_span()
+    {
+        const string searchedText = "satelite";
+        var exported = new List<Activity>();
+        using var factory = new ApiFactory();
+        factory.ThemeSearchReader
+            .Setup(reader => reader.SearchThemesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<ThemeFilters>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        using var configured = Configured(factory, exported);
+
+        var traceId = await GetWithTraceAsync(configured, $"/api/themes?q={searchedText}");
+        var provider = configured.Services.GetRequiredService<TracerProvider>();
+        var span = await WaitForSpanAsync(provider, exported, traceId, TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(span);
+        Assert.DoesNotContain(searchedText, span.DisplayName);
+        Assert.DoesNotContain(span.TagObjects, tag => tag.Value?.ToString()?.Contains(searchedText) == true);
+    }
+
     [Theory]
     [InlineData("/health")]
     [InlineData("/health/ready")]
