@@ -50,6 +50,17 @@ try {
     Copy-Item -Path (Join-Path $PSScriptRoot 'loki\ratio-loki.xml') -Destination $lokiHome -Force
     Register-WinSWService -Name 'ratio-loki' -Directory $lokiHome -WinSWPath $artifacts['winsw']
 
+    Write-Host 'Instalando o Tempo...'
+    $tempoHome = Join-Path $installRoot 'tempo'
+    Stop-ServiceIfPresent -Name 'ratio-tempo'
+    Grant-LocalServiceWrite -Path (Join-Path $dataRoot 'tempo')
+    New-Item -ItemType Directory -Path $tempoHome -Force | Out-Null
+    Expand-TarArchive -Path $artifacts['tempo'] -DestinationPath (Join-Path $staging 'tempo')
+    Copy-Item -Path (Join-Path $staging 'tempo\tempo.exe') -Destination $tempoHome -Force
+    Copy-Item -Path (Join-Path $PSScriptRoot 'tempo\tempo.yml') -Destination $tempoHome -Force
+    Copy-Item -Path (Join-Path $PSScriptRoot 'tempo\ratio-tempo.xml') -Destination $tempoHome -Force
+    Register-WinSWService -Name 'ratio-tempo' -Directory $tempoHome -WinSWPath $artifacts['winsw']
+
     Write-Host 'Instalando o Alloy...'
     $alloyConfig = Join-Path $dataRoot 'alloy\config.alloy'
     New-Item -ItemType Directory -Path (Split-Path -Parent $alloyConfig) -Force | Out-Null
@@ -83,6 +94,7 @@ finally {
 Write-Host 'Aguardando os componentes...'
 Wait-ComponentReady -Name 'Prometheus' -Uri 'http://127.0.0.1:9090/-/ready'
 Wait-ComponentReady -Name 'Loki' -Uri 'http://127.0.0.1:3100/ready'
+Wait-ComponentReady -Name 'Tempo' -Uri 'http://127.0.0.1:3200/ready'
 Wait-ComponentReady -Name 'Alloy' -Uri 'http://127.0.0.1:12345/-/ready'
 Wait-ComponentReady -Name 'Grafana' -Uri 'http://127.0.0.1:3000/api/health'
 
