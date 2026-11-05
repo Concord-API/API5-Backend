@@ -201,8 +201,17 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:8080
         run: |
-          k6 run backend/acceptance/k6/load.ts
+          k6 run --summary-export k6-summary.json backend/acceptance/k6/load.ts
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Upload the load test summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: k6-summary-${{ github.sha }}
+          path: k6-summary.json
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Collect the logs
         if: ${{ failure() }}
