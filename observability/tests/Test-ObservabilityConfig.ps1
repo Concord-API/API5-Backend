@@ -37,7 +37,7 @@ function Find-Executable {
     $file.FullName
 }
 
-$manifest = @(Get-ObservabilityManifest -Path (Join-Path $observability 'artifacts.json') | Where-Object { $_.name -in 'prometheus', 'loki', 'alloy' })
+$manifest = @(Get-ObservabilityManifest -Path (Join-Path $observability 'artifacts.json') | Where-Object { $_.name -in 'prometheus', 'loki', 'tempo', 'alloy' })
 Assert-ArtifactFolder -Manifest $manifest -ArtifactsPath $ArtifactsPath
 $artifacts = @{}
 foreach ($artifact in $manifest) {
@@ -56,6 +56,11 @@ try {
     $env:LOKI_DATA_DIR = Join-Path $work 'loki-data'
     Invoke-ConfigCheck -Name 'Loki' -FilePath $loki -ArgumentList "-config.file=$(Join-Path $observability 'loki\loki.yml')", '-config.expand-env=true', '-verify-config'
 
+    Expand-TarArchive -Path $artifacts['tempo'] -DestinationPath (Join-Path $work 'tempo')
+    $tempo = Find-Executable -Path (Join-Path $work 'tempo') -Filter 'tempo.exe'
+    $env:TEMPO_DATA_DIR = Join-Path $work 'tempo-data'
+    Invoke-ConfigCheck -Name 'Tempo' -FilePath $tempo -ArgumentList "-config.file=$(Join-Path $observability 'tempo\tempo.yml')", '-config.expand-env=true', '-config.verify=true'
+
     & 7z x $artifacts['alloy'] "-o$(Join-Path $work 'alloy')" -y | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Não foi possível extrair o Alloy do instalador (7z terminou com $LASTEXITCODE)."
@@ -66,7 +71,8 @@ try {
 }
 finally {
     Remove-Item -Path Env:LOKI_DATA_DIR -ErrorAction SilentlyContinue
+    Remove-Item -Path Env:TEMPO_DATA_DIR -ErrorAction SilentlyContinue
     Remove-Item -Path $work -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host 'Configurações do Prometheus, do Loki e do Alloy válidas.'
+Write-Host 'Configurações do Prometheus, do Loki, do Tempo e do Alloy válidas.'
