@@ -113,6 +113,28 @@ Describe 'tempo.yml' {
     }
 }
 
+Describe 'config.alloy' {
+    BeforeAll {
+        $config = Get-Content -Path (Join-Path $PSScriptRoot '..' 'alloy' 'config.alloy') -Raw
+    }
+
+    It 'recebe os traces da API e os manda para o lote' {
+        $receiver = [regex]::Match($config, '(?s)otelcol\.receiver\.otlp "api" \{.*?\n\}').Value
+        $receiver | Should -Match 'traces\s*=\s*\[otelcol\.processor\.batch\.default\.input\]'
+    }
+
+    It 'manda os traces do lote para o Tempo' {
+        $batch = [regex]::Match($config, '(?s)otelcol\.processor\.batch "default" \{.*?\n\}').Value
+        $batch | Should -Match 'traces\s*=\s*\[otelcol\.exporter\.otlp\.tempo\.input\]'
+    }
+
+    It 'entrega ao Tempo em 127.0.0.1:4417, sem TLS' {
+        $exporter = [regex]::Match($config, '(?s)otelcol\.exporter\.otlp "tempo" \{.*?\n\}').Value
+        $exporter | Should -Match 'endpoint\s*=\s*"127\.0\.0\.1:4417"'
+        $exporter | Should -Match 'insecure\s*=\s*true'
+    }
+}
+
 Describe 'ratio-tempo.xml' {
     BeforeAll {
         $path = Join-Path $PSScriptRoot '..' 'tempo' 'ratio-tempo.xml'
