@@ -42,24 +42,28 @@ public class TracesExportTests
             .ConfigureTestServices(services =>
                 services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(exported))));
 
-        await configured.CreateClient().GetAsync("/api/themes?q=juros");
+        var traceId = ActivityTraceId.CreateRandom();
+        var client = configured.CreateClient();
+        client.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
+        await client.GetAsync("/api/themes?q=juros");
         var provider = configured.Services.GetRequiredService<TracerProvider>();
 
-        var span = await WaitForSpanAsync(provider, exported, "api/themes");
+        var span = await WaitForSpanAsync(provider, exported, traceId);
 
         Assert.NotNull(span);
+        Assert.Equal("api/themes", span.GetTagItem("http.route"));
         Assert.Equal(ActivityKind.Server, span.Kind);
         Assert.Contains(provider.GetResource().Attributes, attribute =>
             attribute.Key == "service.name" && attribute.Value as string == "ratio-api");
     }
 
-    private static async Task<Activity?> WaitForSpanAsync(TracerProvider provider, List<Activity> exported, string route)
+    private static async Task<Activity?> WaitForSpanAsync(TracerProvider provider, List<Activity> exported, ActivityTraceId traceId)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
             provider.ForceFlush();
-            var found = exported.ToArray().SingleOrDefault(activity => activity.GetTagItem("http.route") as string == route);
+            var found = exported.ToArray().SingleOrDefault(activity => activity.TraceId == traceId);
             if (found is not null)
             {
                 return found;
