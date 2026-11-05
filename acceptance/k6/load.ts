@@ -6,8 +6,11 @@ const baseUrl = __ENV.BASE_URL ?? 'http://127.0.0.1:8080';
 const query = encodeURIComponent('cobranca de divida');
 
 export const options: Options = {
-  vus: 10,
-  duration: '1m',
+  stages: [
+    { duration: '30s', target: 1000 },
+    { duration: '1m', target: 1000 },
+    { duration: '15s', target: 0 },
+  ],
   thresholds: {
     http_req_duration: ['p(95)<500'],
     http_req_failed: ['rate<0.01'],
