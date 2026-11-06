@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -7,6 +8,7 @@ using Moq;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Ratio.Application.Abstractions;
 using Ratio.Application.Filters;
 
@@ -31,7 +33,7 @@ public class TelemetryContractTests
     };
 
     private static WebApplicationFactory<Program> Configured(
-        ApiFactory factory, List<MetricSnapshot> exported, CapturingLogProcessor? logs = null)
+        ApiFactory factory, List<MetricSnapshot> exported, CapturingLogProcessor? logs = null, List<Activity>? spans = null)
     {
         factory.LastExtractionReader
             .Setup(reader => reader.GetLastExtractionAsync(It.IsAny<CancellationToken>()))
@@ -49,7 +51,37 @@ public class TelemetryContractTests
                 {
                     services.ConfigureOpenTelemetryLoggerProvider(logging => logging.AddProcessor(logs));
                 }
+
+                if (spans is not null)
+                {
+                    services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(spans));
+                }
             }));
+    }
+
+    private static async Task<Activity?> RequestSpanAsync(
+        WebApplicationFactory<Program> api, List<Activity> spans, string path)
+    {
+        var traceId = ActivityTraceId.CreateRandom();
+        var client = api.CreateClient();
+        client.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
+        await client.GetAsync(path);
+
+        var provider = api.Services.GetRequiredService<TracerProvider>();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            provider.ForceFlush();
+            var found = spans.ToArray().SingleOrDefault(span => span.TraceId == traceId && span.Kind == ActivityKind.Server);
+            if (found is not null)
+            {
+                return found;
+            }
+
+            await Task.Delay(20);
+        }
+
+        return null;
     }
 
     private static async Task<ExportedLog?> WaitForAsync(CapturingLogProcessor logs, Func<ExportedLog, bool> match)
@@ -139,6 +171,44 @@ public class TelemetryContractTests
         var resource = configured.Services.GetRequiredService<LoggerProvider>().GetResource();
 
         Assert.Contains(resource.Attributes, attribute => attribute is { Key: "service.name", Value: "ratio-api" });
+    }
+
+    [Fact]
+    public void Exports_the_traces_as_the_ratio_api_service()
+    {
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], spans: []);
+
+        var resource = configured.Services.GetRequiredService<TracerProvider>().GetResource();
+
+        Assert.Contains(resource.Attributes, attribute => attribute is { Key: "service.name", Value: "ratio-api" });
+    }
+
+    [Fact]
+    public async Task Exports_a_server_span_with_the_route_for_each_api_request()
+    {
+        var spans = new List<Activity>();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], spans: spans);
+
+        var span = await RequestSpanAsync(configured, spans, $"/api/themes?q={SearchedText}");
+
+        Assert.NotNull(span);
+        Assert.Equal("api/themes", span.GetTagItem("http.route"));
+    }
+
+    [Fact]
+    public async Task Keeps_the_search_text_out_of_the_request_span()
+    {
+        var spans = new List<Activity>();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], spans: spans);
+
+        var span = await RequestSpanAsync(configured, spans, $"/api/themes?q={SearchedText}");
+
+        Assert.NotNull(span);
+        Assert.DoesNotContain(SearchedText, span.DisplayName);
+        Assert.DoesNotContain(span.TagObjects, tag => tag.Value?.ToString()?.Contains(SearchedText) == true);
     }
 
     [Fact]
