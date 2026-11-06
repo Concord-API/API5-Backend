@@ -51,6 +51,16 @@ public class DatabaseTracesTests(PostgresFixture postgres) : IClassFixture<Postg
     }
 
     [Fact]
+    public async Task Marks_each_database_command_as_postgresql()
+    {
+        var spans = await SearchWithTraceAsync();
+
+        var commands = spans.Where(span => span.Source.Name == "Npgsql").ToList();
+        Assert.NotEmpty(commands);
+        Assert.All(commands, command => Assert.Equal("postgresql", command.GetTagItem("db.system")));
+    }
+
+    [Fact]
     public async Task Keeps_the_search_text_out_of_the_database_spans()
     {
         var spans = await SearchWithTraceAsync();
