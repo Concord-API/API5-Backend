@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
@@ -6,7 +7,8 @@ using OpenTelemetry.Logs;
 namespace Ratio.Api.Tests.Observability;
 
 public sealed record ExportedLog(
-    string Category, LogLevel Level, string? Message, IReadOnlyDictionary<string, object?> Attributes);
+    string Category, LogLevel Level, string? Message, IReadOnlyDictionary<string, object?> Attributes,
+    ActivityTraceId TraceId, ActivitySpanId SpanId);
 
 public sealed class CapturingLogProcessor : BaseProcessor<LogRecord>
 {
@@ -17,5 +19,7 @@ public sealed class CapturingLogProcessor : BaseProcessor<LogRecord>
             data.CategoryName ?? "",
             data.LogLevel,
             data.FormattedMessage,
-            (data.Attributes ?? []).ToDictionary(attribute => attribute.Key, attribute => attribute.Value)));
+            (data.Attributes ?? []).ToDictionary(attribute => attribute.Key, attribute => attribute.Value),
+            data.TraceId,
+            data.SpanId));
 }

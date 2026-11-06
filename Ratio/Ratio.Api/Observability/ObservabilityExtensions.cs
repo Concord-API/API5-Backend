@@ -1,6 +1,7 @@
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace Ratio.Api.Observability;
 
@@ -44,6 +45,12 @@ public static class ObservabilityExtensions
             .ConfigureResource(resource => resource.AddService(ServiceName))
             .WithMetrics(metrics => metrics
                 .AddMeter(Meters)
+                .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
+            .WithTracing(tracing => tracing
+                .SetSampler(new ParentBasedSampler(new RequestRootSampler()))
+                .AddAspNetCoreInstrumentation(options =>
+                    options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
+                .AddSource("Npgsql")
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
             .WithLogging(
                 logging => logging.AddOtlpExporter(options => options.Endpoint = otlpEndpoint),
