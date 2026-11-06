@@ -214,14 +214,22 @@ Describe 'fontes de dados do Grafana' {
     BeforeAll {
         $path = Join-Path $PSScriptRoot '..' 'grafana' 'provisioning' 'datasources' 'ratio.yaml'
         $sources = @{}
+        $blocks = @{}
         if (Test-Path -Path $path) {
-            $blocks = (Get-Content -Path $path -Raw) -split '(?m)^\s*-\s+name:\s*'
-            foreach ($block in $blocks | Select-Object -Skip 1) {
+            foreach ($block in (Get-Content -Path $path -Raw) -split '(?m)^  -[ \t]+name:[ \t]*' | Select-Object -Skip 1) {
                 $entry = @{}
-                foreach ($match in [regex]::Matches($block, '(?m)^\s*(\w+):\s*(\S+)\s*$')) {
-                    $entry[$match.Groups[1].Value] = $match.Groups[2].Value
+                foreach ($match in [regex]::Matches($block, '(?m)^[ \t]*(?:-[ \t]+)?(\w+):[ \t]*(\S.*?)[ \t]*\r?$')) {
+                    $value = $match.Groups[2].Value
+                    if ($value -match "^'(.*)'$") {
+                        $value = $Matches[1] -replace "''", "'"
+                    }
+                    if (-not $entry.ContainsKey($match.Groups[1].Value)) {
+                        $entry[$match.Groups[1].Value] = $value
+                    }
                 }
-                $sources[($block -split '\r?\n')[0].Trim()] = $entry
+                $name = ($block -split '\r?\n')[0].Trim()
+                $sources[$name] = $entry
+                $blocks[$name] = $block
             }
         }
     }
@@ -243,7 +251,26 @@ Describe 'fontes de dados do Grafana' {
         $sources['Loki'].url | Should -Be 'http://127.0.0.1:3100'
     }
 
-    It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }) {
+    It 'provisiona o Tempo em 127.0.0.1:3200' {
+        $sources['Tempo'].type | Should -Be 'tempo'
+        $sources['Tempo'].uid | Should -Be 'tempo'
+        $sources['Tempo'].url | Should -Be 'http://127.0.0.1:3200'
+    }
+
+    It 'abre no Loki os logs da API com o trace_id do trace' {
+        $sources['Tempo'].datasourceUid | Should -Be 'loki'
+        $sources['Tempo'].customQuery | Should -Be 'true'
+        $sources['Tempo'].query | Should -Be '{service_name="ratio-api"} | trace_id="$${__trace.traceId}"'
+    }
+
+    It 'abre no Tempo o trace do trace_id de cada linha de log' {
+        $sources['Loki'].datasourceUid | Should -Be 'tempo'
+        $sources['Loki'].matcherType | Should -Be 'label'
+        $sources['Loki'].matcherRegex | Should -Be 'trace_id'
+        $blocks['Loki'] | Should -Match "(?m)^\s+url: '\`$\`$\{__value\.raw\}'\r?$"
+    }
+
+    It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }, @{ Name = 'Tempo' }) {
         $sources[$Name].editable | Should -Be 'false'
     }
 }
@@ -285,11 +312,21 @@ Describe 'painéis do Grafana' {
         @($uids | Sort-Object -Unique).Count | Should -Be $dashboards.Count
     }
 
-    It 'consulta só as fontes prometheus e loki' {
+    It 'consulta só as fontes prometheus, loki e tempo' {
         $targets.Count | Should -BeGreaterThan 0
         foreach ($item in $targets) {
-            $item.Target.datasource.uid | Should -BeIn @('prometheus', 'loki') -Because $item.Where
+            $item.Target.datasource.uid | Should -BeIn @('prometheus', 'loki', 'tempo') -Because $item.Where
         }
+    }
+
+    It 'lista no painel API os traces de <Title>' -TestCases @(
+        @{ Title = 'Requisições acima de 1 s'; Query = '{resource.service.name="ratio-api" && kind=server && duration > 1s}' },
+        @{ Title = 'Requisições com erro'; Query = '{resource.service.name="ratio-api" && kind=server && status=error}' }
+    ) {
+        $item = $targets | Where-Object { $_.Where -eq "api.json / $Title" }
+        $item.Target.datasource.uid | Should -Be 'tempo'
+        $item.Target.queryType | Should -Be 'traceql'
+        $item.Target.query | Should -Be $Query
     }
 
     It 'usa $__rate_interval em todo rate' {

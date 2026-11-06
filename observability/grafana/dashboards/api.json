@@ -1,7 +1,7 @@
 {
   "uid": "ratio-api",
   "title": "Ratio · API",
-  "description": "Requisições, latência e erros por rota, processo .NET e logs.",
+  "description": "Requisições, latência e erros por rota, processo .NET, traces e logs.",
   "tags": [
     "ratio"
   ],
@@ -416,13 +416,98 @@
     {
       "id": 9,
       "type": "row",
-      "title": "Logs",
+      "title": "Traces",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 25
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Requisições acima de 1 s",
+      "description": "Requisições que passaram do limite laranja do P95. Clique no trace para ver o tempo de cada consulta ao banco.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ratio-api\" && kind=server && duration > 1s}",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      }
+    },
+    {
+      "type": "table",
+      "title": "Requisições com erro",
+      "description": "Requisições que terminaram com erro do servidor (5xx). Clique no trace para ver onde falhou.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"ratio-api\" && kind=server && status=error}",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
       },
       "panels": []
     },
@@ -452,12 +537,12 @@
         "dedupStrategy": "none",
         "prettifyLogMessage": false
       },
-      "id": 10,
+      "id": 13,
       "gridPos": {
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 36
       }
     }
   ]
