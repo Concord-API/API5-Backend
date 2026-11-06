@@ -198,6 +198,21 @@ public class TelemetryContractTests
     }
 
     [Fact]
+    public async Task Exports_the_method_status_and_redacted_query_on_the_request_span()
+    {
+        var spans = new List<Activity>();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], spans: spans);
+
+        var span = await RequestSpanAsync(configured, spans, $"/api/themes?q={SearchedText}");
+
+        Assert.NotNull(span);
+        Assert.Equal("GET", span.GetTagItem("http.request.method"));
+        Assert.Equal(200, span.GetTagItem("http.response.status_code"));
+        Assert.Equal("?q=Redacted", span.GetTagItem("url.query"));
+    }
+
+    [Fact]
     public async Task Keeps_the_search_text_out_of_the_request_span()
     {
         var spans = new List<Activity>();
