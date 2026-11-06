@@ -215,11 +215,15 @@ Describe 'fontes de dados do Grafana' {
         $path = Join-Path $PSScriptRoot '..' 'grafana' 'provisioning' 'datasources' 'ratio.yaml'
         $sources = @{}
         if (Test-Path -Path $path) {
-            $blocks = (Get-Content -Path $path -Raw) -split '(?m)^\s*-\s+name:\s*'
+            $blocks = (Get-Content -Path $path -Raw) -split '(?m)^  -[ \t]+name:[ \t]*'
             foreach ($block in $blocks | Select-Object -Skip 1) {
                 $entry = @{}
-                foreach ($match in [regex]::Matches($block, '(?m)^\s*(\w+):\s*(\S+)\s*$')) {
-                    $entry[$match.Groups[1].Value] = $match.Groups[2].Value
+                foreach ($match in [regex]::Matches($block, '(?m)^[ \t]*(?:-[ \t]+)?(\w+):[ \t]*(\S.*?)[ \t]*\r?$')) {
+                    $value = $match.Groups[2].Value
+                    if ($value -match "^'(.*)'$") {
+                        $value = $Matches[1] -replace "''", "'"
+                    }
+                    $entry[$match.Groups[1].Value] = $value
                 }
                 $sources[($block -split '\r?\n')[0].Trim()] = $entry
             }
