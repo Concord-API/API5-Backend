@@ -247,7 +247,13 @@ Describe 'fontes de dados do Grafana' {
         $sources['Loki'].url | Should -Be 'http://127.0.0.1:3100'
     }
 
-    It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }) {
+    It 'provisiona o Tempo em 127.0.0.1:3200' {
+        $sources['Tempo'].type | Should -Be 'tempo'
+        $sources['Tempo'].uid | Should -Be 'tempo'
+        $sources['Tempo'].url | Should -Be 'http://127.0.0.1:3200'
+    }
+
+    It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }, @{ Name = 'Tempo' }) {
         $sources[$Name].editable | Should -Be 'false'
     }
 }
