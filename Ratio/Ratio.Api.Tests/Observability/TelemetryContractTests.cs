@@ -213,6 +213,24 @@ public class TelemetryContractTests
     }
 
     [Fact]
+    public async Task Logs_the_request_with_the_span_id_of_the_exported_server_span()
+    {
+        var spans = new List<Activity>();
+        using var logs = new CapturingLogProcessor();
+        using var factory = new ApiFactory();
+        using var configured = Configured(factory, [], logs, spans);
+
+        var span = await RequestSpanAsync(configured, spans, $"/api/themes?q={SearchedText}");
+        Assert.NotNull(span);
+        var requestLog = await WaitForAsync(logs, log =>
+            log.TraceId == span.TraceId
+            && log.Attributes.TryGetValue("RequestPath", out var path) && Equals(path, "/api/themes"));
+
+        Assert.NotNull(requestLog);
+        Assert.Equal(span.SpanId, requestLog.SpanId);
+    }
+
+    [Fact]
     public async Task Keeps_the_search_text_out_of_the_request_span()
     {
         var spans = new List<Activity>();
