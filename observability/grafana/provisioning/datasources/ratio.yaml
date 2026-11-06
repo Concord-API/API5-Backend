@@ -16,6 +16,14 @@ datasources:
     access: proxy
     url: http://127.0.0.1:3100
     editable: false
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: '$${__value.raw}'
+          urlDisplayLabel: Ver trace
   - name: Tempo
     uid: tempo
     type: tempo
