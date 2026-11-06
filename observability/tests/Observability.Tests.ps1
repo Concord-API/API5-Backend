@@ -312,11 +312,21 @@ Describe 'painéis do Grafana' {
         @($uids | Sort-Object -Unique).Count | Should -Be $dashboards.Count
     }
 
-    It 'consulta só as fontes prometheus e loki' {
+    It 'consulta só as fontes prometheus, loki e tempo' {
         $targets.Count | Should -BeGreaterThan 0
         foreach ($item in $targets) {
-            $item.Target.datasource.uid | Should -BeIn @('prometheus', 'loki') -Because $item.Where
+            $item.Target.datasource.uid | Should -BeIn @('prometheus', 'loki', 'tempo') -Because $item.Where
         }
+    }
+
+    It 'lista no painel API os traces de <Title>' -TestCases @(
+        @{ Title = 'Requisições acima de 1 s'; Query = '{resource.service.name="ratio-api" && kind=server && duration > 1s}' },
+        @{ Title = 'Requisições com erro'; Query = '{resource.service.name="ratio-api" && kind=server && status=error}' }
+    ) {
+        $item = $targets | Where-Object { $_.Where -eq "api.json / $Title" }
+        $item.Target.datasource.uid | Should -Be 'tempo'
+        $item.Target.queryType | Should -Be 'traceql'
+        $item.Target.query | Should -Be $Query
     }
 
     It 'usa $__rate_interval em todo rate' {
