@@ -7,8 +7,11 @@ public sealed class PostgresFixture : IAsyncLifetime
 {
     private const string Extensions = "CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;";
 
+    public const string Password = "ratio-segredo-7f3a";
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:16")
+        .WithPassword(Password)
         .WithEnvironment("POSTGRES_INITDB_ARGS", "--locale-provider=icu --icu-locale=pt-BR --encoding=UTF8 --locale=C.utf8")
         .Build();
 

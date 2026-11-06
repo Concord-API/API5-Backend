@@ -61,6 +61,18 @@ public class DatabaseTracesTests(PostgresFixture postgres) : IClassFixture<Postg
     }
 
     [Fact]
+    public async Task Keeps_the_database_password_out_of_the_spans()
+    {
+        var spans = await SearchWithTraceAsync();
+
+        Assert.Contains(spans, span => span.Source.Name == "Npgsql");
+        Assert.All(spans, span => Assert.DoesNotContain(span.TagObjects, tag =>
+            tag.Value?.ToString() is { } value
+            && (value.Contains(PostgresFixture.Password)
+                || value.Contains("password", StringComparison.OrdinalIgnoreCase))));
+    }
+
+    [Fact]
     public async Task Keeps_the_search_text_out_of_the_database_spans()
     {
         var spans = await SearchWithTraceAsync();
