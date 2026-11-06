@@ -253,6 +253,12 @@ Describe 'fontes de dados do Grafana' {
         $sources['Tempo'].url | Should -Be 'http://127.0.0.1:3200'
     }
 
+    It 'abre no Loki os logs da API com o trace_id do trace' {
+        $sources['Tempo'].datasourceUid | Should -Be 'loki'
+        $sources['Tempo'].customQuery | Should -Be 'true'
+        $sources['Tempo'].query | Should -Be '{service_name="ratio-api"} | trace_id="$${__trace.traceId}"'
+    }
+
     It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }, @{ Name = 'Tempo' }) {
         $sources[$Name].editable | Should -Be 'false'
     }
