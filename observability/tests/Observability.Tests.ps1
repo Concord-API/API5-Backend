@@ -214,18 +214,22 @@ Describe 'fontes de dados do Grafana' {
     BeforeAll {
         $path = Join-Path $PSScriptRoot '..' 'grafana' 'provisioning' 'datasources' 'ratio.yaml'
         $sources = @{}
+        $blocks = @{}
         if (Test-Path -Path $path) {
-            $blocks = (Get-Content -Path $path -Raw) -split '(?m)^  -[ \t]+name:[ \t]*'
-            foreach ($block in $blocks | Select-Object -Skip 1) {
+            foreach ($block in (Get-Content -Path $path -Raw) -split '(?m)^  -[ \t]+name:[ \t]*' | Select-Object -Skip 1) {
                 $entry = @{}
                 foreach ($match in [regex]::Matches($block, '(?m)^[ \t]*(?:-[ \t]+)?(\w+):[ \t]*(\S.*?)[ \t]*\r?$')) {
                     $value = $match.Groups[2].Value
                     if ($value -match "^'(.*)'$") {
                         $value = $Matches[1] -replace "''", "'"
                     }
-                    $entry[$match.Groups[1].Value] = $value
+                    if (-not $entry.ContainsKey($match.Groups[1].Value)) {
+                        $entry[$match.Groups[1].Value] = $value
+                    }
                 }
-                $sources[($block -split '\r?\n')[0].Trim()] = $entry
+                $name = ($block -split '\r?\n')[0].Trim()
+                $sources[$name] = $entry
+                $blocks[$name] = $block
             }
         }
     }
@@ -257,6 +261,13 @@ Describe 'fontes de dados do Grafana' {
         $sources['Tempo'].datasourceUid | Should -Be 'loki'
         $sources['Tempo'].customQuery | Should -Be 'true'
         $sources['Tempo'].query | Should -Be '{service_name="ratio-api"} | trace_id="$${__trace.traceId}"'
+    }
+
+    It 'abre no Tempo o trace do trace_id de cada linha de log' {
+        $sources['Loki'].datasourceUid | Should -Be 'tempo'
+        $sources['Loki'].matcherType | Should -Be 'label'
+        $sources['Loki'].matcherRegex | Should -Be 'trace_id'
+        $blocks['Loki'] | Should -Match "(?m)^\s+url: '\`$\`$\{__value\.raw\}'\r?$"
     }
 
     It 'não deixa editar <Name> pela tela' -TestCases @(@{ Name = 'Prometheus' }, @{ Name = 'Loki' }, @{ Name = 'Tempo' }) {
