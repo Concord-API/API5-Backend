@@ -6,6 +6,7 @@ otelcol.receiver.otlp "api" {
   output {
     metrics = [otelcol.processor.batch.default.input]
     logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
   }
 }
 
@@ -13,6 +14,7 @@ otelcol.processor.batch "default" {
   output {
     metrics = [otelcol.exporter.prometheus.default.input]
     logs    = [otelcol.exporter.otlphttp.loki.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
@@ -29,6 +31,16 @@ prometheus.remote_write "local" {
 otelcol.exporter.otlphttp "loki" {
   client {
     endpoint = "http://127.0.0.1:3100/otlp"
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "127.0.0.1:4417"
+
+    tls {
+      insecure = true
+    }
   }
 }
 
