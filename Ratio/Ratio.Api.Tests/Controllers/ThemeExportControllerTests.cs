@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Moq;
 using Ratio.Application.Abstractions;
@@ -57,6 +58,19 @@ public class ThemeExportControllerTests(ApiFactory factory) : IClassFixture<ApiF
                 ""
             ],
             lines);
+    }
+
+    [Fact]
+    public async Task Starts_the_file_with_a_utf8_byte_order_mark()
+    {
+        Returns(416, Cases);
+
+        var response = await _client.GetAsync("/api/themes/416/export");
+
+        Assert.Equal("utf-8", response.Content.Headers.ContentType?.CharSet);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal([0xEF, 0xBB, 0xBF], bytes[..3]);
+        Assert.Contains("Data de extração;", Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3));
     }
 
     [Fact]
