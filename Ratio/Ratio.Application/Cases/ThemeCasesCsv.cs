@@ -16,9 +16,16 @@ public static class ThemeCasesCsv
 
     private static readonly char[] CharactersToQuote = [',', '"', '\r', '\n'];
 
-    public static string Write(IReadOnlyList<SampleCase> cases)
+    public static string Write(ExportHeader header, IReadOnlyList<SampleCase> cases)
     {
         var csv = new StringBuilder();
+
+        foreach (var line in HeaderLines(header))
+        {
+            AppendLine(csv, line);
+        }
+
+        csv.Append(LineBreak);
         AppendLine(csv, Header);
 
         foreach (var sampleCase in cases)
@@ -28,6 +35,28 @@ public static class ThemeCasesCsv
 
         return csv.ToString();
     }
+
+    private static IEnumerable<string?[]> HeaderLines(ExportHeader header)
+    {
+        if (header.Sources.Count == 0)
+        {
+            yield return ["Fonte", null];
+            yield return ["Data de extração", null];
+        }
+
+        foreach (var source in header.Sources)
+        {
+            yield return ["Fonte", source.Name, source.SourceUrl];
+            yield return ["Data de extração", IsoDate(source.ExtractedAt.UtcDateTime)];
+        }
+
+        yield return ["Escopo", ScopeText(header.Scope)];
+    }
+
+    private static string ScopeText(Scope scope) =>
+        scope.Statement is null ? scope.Subject : $"{scope.Subject} · {scope.Statement}";
+
+    private static string IsoDate(DateTime date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string?[] Cells(SampleCase sampleCase) =>
     [

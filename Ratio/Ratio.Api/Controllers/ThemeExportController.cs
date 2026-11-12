@@ -2,12 +2,17 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
 using Ratio.Application.Cases;
+using Ratio.Application.Coverage;
+using Ratio.Application.DataSources;
 
 namespace Ratio.Api.Controllers;
 
 [ApiController]
 [Route("api/themes/{key:long}/export")]
-public class ThemeExportController(IThemeCasesReader themeCasesReader) : ControllerBase
+public class ThemeExportController(
+    IThemeCasesReader themeCasesReader,
+    IProvenanceReader provenanceReader,
+    IScopeReader scopeReader) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Get(long key, [FromQuery] string? format, CancellationToken cancellationToken)
@@ -24,6 +29,10 @@ public class ThemeExportController(IThemeCasesReader themeCasesReader) : Control
             return Problem(detail: "Tema não encontrado.", statusCode: StatusCodes.Status404NotFound);
         }
 
-        return File(Encoding.UTF8.GetBytes(ThemeCasesCsv.Write(cases)), "text/csv", $"tema-{key}.csv");
+        var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
+        var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
+        var header = new ExportHeader(provenance.Sources.Where(source => source.Block == "cases").ToArray(), scope);
+
+        return File(Encoding.UTF8.GetBytes(ThemeCasesCsv.Write(header, cases)), "text/csv", $"tema-{key}.csv");
     }
 }
