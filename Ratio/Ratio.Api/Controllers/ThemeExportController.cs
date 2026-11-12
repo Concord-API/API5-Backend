@@ -33,6 +33,8 @@ public class ThemeExportController(
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
         var header = new ExportHeader(provenance.Sources.Where(source => source.Block == "cases").ToArray(), scope);
 
-        return File(Encoding.UTF8.GetBytes(ThemeCasesCsv.Write(header, cases)), "text/csv", $"tema-{key}.csv");
+        byte[] content = [.. Encoding.UTF8.Preamble, .. Encoding.UTF8.GetBytes(ThemeCasesCsv.Write(header, cases))];
+
+        return File(content, "text/csv; charset=utf-8", $"tema-{key}.csv");
     }
 }
