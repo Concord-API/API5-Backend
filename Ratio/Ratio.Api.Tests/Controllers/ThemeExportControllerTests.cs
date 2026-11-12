@@ -46,14 +46,14 @@ public class ThemeExportControllerTests(ApiFactory factory) : IClassFixture<ApiF
         var lines = (await response.Content.ReadAsStringAsync()).Split("\r\n");
         Assert.Equal(
             [
-                "Fonte,DataJud/CNJ,https://www.cnj.jus.br/sistemas/datajud/",
-                "Data de extração,2026-08-28",
-                "Escopo,\"cível · TJMG, TJRJ e TJSP\"",
+                "Fonte;DataJud/CNJ;https://www.cnj.jus.br/sistemas/datajud/",
+                "Data de extração;28/08/2026",
+                "Escopo;cível · TJMG, TJRJ e TJSP",
                 "",
-                "Processo,Tribunal,Órgão julgador,Classe,Grau,Data do julgamento,Resultado,Fonte,Link,Tipo do link,Sigilo",
-                "0001234-56.2024.8.26.0100,TJSP,5ª Câmara de Direito Privado,Apelação Cível,Second,2025-06-15," +
-                "Procedente,datajud,https://esaj.tjsp.jus.br/cpopg/open.do,portal,não",
-                ",,,,,,,,,,sim",
+                "Processo;Tribunal;Órgão julgador;Classe;Grau;Data do julgamento;Resultado;Fonte;Link;Tipo do link;Sigilo",
+                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;Apelação Cível;Second;15/06/2025;" +
+                "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
+                ";;;;;;;;;;sim",
                 ""
             ],
             lines);
@@ -81,7 +81,7 @@ public class ThemeExportControllerTests(ApiFactory factory) : IClassFixture<ApiF
 
         var csv = await _client.GetStringAsync("/api/themes/415/export");
 
-        Assert.StartsWith("Fonte,\r\nData de extração,\r\nEscopo,", csv);
+        Assert.StartsWith("Fonte;\r\nData de extração;\r\nEscopo;", csv);
     }
 
     [Fact]
