@@ -310,6 +310,62 @@ public class ThemeCasesReaderTests(PostgresFixture postgres) : IClassFixture<Pos
     }
 
     [Fact]
+    public async Task Lists_every_case_of_the_theme_in_the_sample_order()
+    {
+        await InsertTiedCasesAsync();
+
+        var sample = await _reader.ListCasesAsync(412, 20, CancellationToken.None);
+        var all = await _reader.ListAllCasesAsync(412, CancellationToken.None);
+
+        Assert.Equal(sample!.Cases, all);
+    }
+
+    [Fact]
+    public async Task Lists_every_case_of_the_theme_beyond_the_sample_limit()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20240320);
+        await InsertCaseAsync("CASE-2", 220, 20250910);
+        await InsertCaseAsync("CASE-3", 219, 20250615);
+        await RefreshAsync();
+
+        var all = await _reader.ListAllCasesAsync(412, CancellationToken.None);
+
+        Assert.Equal(["CASE-2", "CASE-3", "CASE-1"], all!.Select(sampleCase => sampleCase.CaseNumber));
+    }
+
+    [Fact]
+    public async Task Lists_a_sealed_case_last_with_every_column_hidden()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20240320, secrecyLevel: 1);
+        await InsertCaseAsync("CASE-2", 220, 20250910);
+        await RefreshAsync();
+
+        var all = await _reader.ListAllCasesAsync(412, CancellationToken.None);
+
+        Assert.Equal(SampleCase.SealedCase, all![^1]);
+        Assert.Equal("CASE-2", all[0].CaseNumber);
+    }
+
+    [Fact]
+    public async Task Lists_null_for_an_unknown_theme()
+    {
+        await RefreshAsync();
+
+        Assert.Null(await _reader.ListAllCasesAsync(999, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Lists_no_cases_when_the_current_result_was_never_refreshed()
+    {
+        await InsertCaseAsync("CASE-1", 219, 20250615);
+
+        var all = await _reader.ListAllCasesAsync(412, CancellationToken.None);
+
+        Assert.NotNull(all);
+        Assert.Empty(all);
+    }
+
+    [Fact]
     public async Task Returns_no_cases_when_the_current_result_was_never_refreshed()
     {
         await InsertCaseAsync("CASE-1", 219, 20250615);
