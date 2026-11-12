@@ -47,8 +47,13 @@ public static class ThemeCasesCsv
     private static void AppendLine(StringBuilder csv, IEnumerable<string?> cells) =>
         csv.Append(string.Join(',', cells.Select(Escape))).Append(LineBreak);
 
-    private static string Escape(string? cell) =>
-        cell is null ? "" :
-        cell.IndexOfAny(CharactersToQuote) >= 0 ? $"\"{cell.Replace("\"", "\"\"")}\"" :
-        cell;
+    private static string Escape(string? cell)
+    {
+        if (cell is null)
+        {
+            return "";
+        }
+
+        return cell.IndexOfAny(CharactersToQuote) >= 0 ? $"\"{cell.Replace("\"", "\"\"")}\"" : cell;
+    }
 }
