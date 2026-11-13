@@ -6,7 +6,7 @@ namespace Ratio.Application.Tests.Cases;
 public class ThemeCasesCsvTests
 {
     private const string Header =
-        "Processo,Tribunal,Órgão julgador,Classe,Grau,Data do julgamento,Resultado,Fonte,Link,Tipo do link,Sigilo";
+        "Processo;Tribunal;Órgão julgador;Classe;Grau;Data do julgamento;Resultado;Fonte;Link;Tipo do link;Sigilo";
 
     private static readonly SampleCase PublicCase = new(
         "0001234-56.2024.8.26.0100",
@@ -48,9 +48,9 @@ public class ThemeCasesCsvTests
     {
         Assert.Equal(
             [
-                "Fonte,DataJud/CNJ,https://www.cnj.jus.br/sistemas/datajud/",
-                "Data de extração,2026-08-28",
-                "Escopo,\"cível · TJMG, TJRJ e TJSP\""
+                "Fonte;DataJud/CNJ;https://www.cnj.jus.br/sistemas/datajud/",
+                "Data de extração;28/08/2026",
+                "Escopo;cível · TJMG, TJRJ e TJSP"
             ],
             HeaderLines(ThemeCasesCsv.Write(Loaded, [])));
     }
@@ -70,11 +70,11 @@ public class ThemeCasesCsvTests
 
         Assert.Equal(
             [
-                "Fonte,DataJud/CNJ,https://www.cnj.jus.br/sistemas/datajud/",
-                "Data de extração,2026-08-28",
-                "Fonte,TJSP,",
-                "Data de extração,2026-09-02",
-                "Escopo,\"cível · TJMG, TJRJ e TJSP\""
+                "Fonte;DataJud/CNJ;https://www.cnj.jus.br/sistemas/datajud/",
+                "Data de extração;28/08/2026",
+                "Fonte;TJSP;",
+                "Data de extração;02/09/2026",
+                "Escopo;cível · TJMG, TJRJ e TJSP"
             ],
             lines);
     }
@@ -84,7 +84,7 @@ public class ThemeCasesCsvTests
     {
         var lines = HeaderLines(ThemeCasesCsv.Write(Loaded with { Sources = [] }, []));
 
-        Assert.Equal(["Fonte,", "Data de extração,", "Escopo,\"cível · TJMG, TJRJ e TJSP\""], lines);
+        Assert.Equal(["Fonte;", "Data de extração;", "Escopo;cível · TJMG, TJRJ e TJSP"], lines);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class ThemeCasesCsvTests
     {
         var lines = HeaderLines(ThemeCasesCsv.Write(Loaded with { Scope = new([], "cível", null) }, []));
 
-        Assert.Equal("Escopo,cível", lines[^1]);
+        Assert.Equal("Escopo;cível", lines[^1]);
     }
 
     [Fact]
@@ -109,8 +109,8 @@ public class ThemeCasesCsvTests
         Assert.Equal(
             [
                 Header,
-                "0001234-56.2024.8.26.0100,TJSP,5ª Câmara de Direito Privado,Apelação Cível,Second,2025-06-15," +
-                "Procedente,datajud,https://esaj.tjsp.jus.br/cpopg/open.do,portal,não",
+                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;Apelação Cível;Second;15/06/2025;" +
+                "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
                 ""
             ],
             lines);
@@ -126,8 +126,8 @@ public class ThemeCasesCsvTests
                 PublicCase with { CaseNumber = "CASE-A" }
             ]));
 
-        Assert.StartsWith("CASE-B,", lines[1]);
-        Assert.StartsWith("CASE-A,", lines[2]);
+        Assert.StartsWith("CASE-B;", lines[1]);
+        Assert.StartsWith("CASE-A;", lines[2]);
     }
 
     [Fact]
@@ -136,8 +136,8 @@ public class ThemeCasesCsvTests
         var lines = TableLines(ThemeCasesCsv.Write(Loaded, [PublicCase with { JudgingBody = null, DecisionDate = null }]));
 
         Assert.Equal(
-            "0001234-56.2024.8.26.0100,TJSP,,Apelação Cível,Second,," +
-            "Procedente,datajud,https://esaj.tjsp.jus.br/cpopg/open.do,portal,não",
+            "0001234-56.2024.8.26.0100;TJSP;;Apelação Cível;Second;;" +
+            "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
             lines[1]);
     }
 
@@ -146,17 +146,18 @@ public class ThemeCasesCsvTests
     {
         var lines = TableLines(ThemeCasesCsv.Write(Loaded, [SampleCase.SealedCase]));
 
-        Assert.Equal(",,,,,,,,,,sim", lines[1]);
+        Assert.Equal(";;;;;;;;;;sim", lines[1]);
     }
 
     [Theory]
-    [InlineData("Câmara, Seção", "\"Câmara, Seção\"")]
+    [InlineData("Câmara; Seção", "\"Câmara; Seção\"")]
     [InlineData("Câmara \"A\"", "\"Câmara \"\"A\"\"\"")]
     [InlineData("Câmara\nA", "\"Câmara\nA\"")]
+    [InlineData("Câmara, Seção", "Câmara, Seção")]
     public void Quotes_a_cell_with_a_separator_a_quote_or_a_line_break(string judgingBody, string expected)
     {
         var csv = ThemeCasesCsv.Write(Loaded, [PublicCase with { JudgingBody = judgingBody }]);
 
-        Assert.Contains($",TJSP,{expected},Apelação Cível,", csv);
+        Assert.Contains($";TJSP;{expected};Apelação Cível;", csv);
     }
 }

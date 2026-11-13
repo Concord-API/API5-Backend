@@ -14,7 +14,9 @@ public static class ThemeCasesCsv
         "Resultado", "Fonte", "Link", "Tipo do link", "Sigilo"
     ];
 
-    private static readonly char[] CharactersToQuote = [',', '"', '\r', '\n'];
+    private const char Separator = ';';
+
+    private static readonly char[] CharactersToQuote = [Separator, '"', '\r', '\n'];
 
     public static string Write(ExportHeader header, IReadOnlyList<SampleCase> cases)
     {
@@ -47,7 +49,7 @@ public static class ThemeCasesCsv
         foreach (var source in header.Sources)
         {
             yield return ["Fonte", source.Name, source.SourceUrl];
-            yield return ["Data de extração", IsoDate(source.ExtractedAt.UtcDateTime)];
+            yield return ["Data de extração", BrazilianDate(DateOnly.FromDateTime(source.ExtractedAt.UtcDateTime))];
         }
 
         yield return ["Escopo", ScopeText(header.Scope)];
@@ -56,7 +58,7 @@ public static class ThemeCasesCsv
     private static string ScopeText(Scope scope) =>
         scope.Statement is null ? scope.Subject : $"{scope.Subject} · {scope.Statement}";
 
-    private static string IsoDate(DateTime date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private static string BrazilianDate(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
     private static string?[] Cells(SampleCase sampleCase) =>
     [
@@ -65,7 +67,7 @@ public static class ThemeCasesCsv
         sampleCase.JudgingBody,
         sampleCase.CaseClass,
         sampleCase.CourtLevel,
-        sampleCase.DecisionDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        sampleCase.DecisionDate is { } date ? BrazilianDate(date) : null,
         sampleCase.Outcome,
         sampleCase.Source,
         sampleCase.SourceLink,
@@ -74,7 +76,7 @@ public static class ThemeCasesCsv
     ];
 
     private static void AppendLine(StringBuilder csv, IEnumerable<string?> cells) =>
-        csv.Append(string.Join(',', cells.Select(Escape))).Append(LineBreak);
+        csv.Append(string.Join(Separator, cells.Select(Escape))).Append(LineBreak);
 
     private static string Escape(string? cell)
     {
