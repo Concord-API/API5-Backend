@@ -33,6 +33,8 @@ public sealed record ThemeDetail(
     public RelatedDoctrine RelatedDoctrine { get; init; } = RelatedDoctrine.Empty;
 
     public Scope? Scope { get; init; }
+
+    public string? Citation { get; init; }
 }
 
 public sealed record ThemeNarrative(
