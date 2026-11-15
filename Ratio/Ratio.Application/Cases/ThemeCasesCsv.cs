@@ -10,8 +10,8 @@ public static class ThemeCasesCsv
 
     private static readonly string[] Header =
     [
-        "Processo", "Tribunal", "Órgão julgador", "Classe", "Grau", "Data do julgamento",
-        "Resultado", "Fonte", "Link", "Tipo do link", "Sigilo"
+        "Processo", "Tribunal", "Órgão julgador", "Relator", "Classe", "Grau", "Data do julgamento",
+        "Resultado", "Valor fixado", "Fonte", "Link", "Tipo do link", "Sigilo"
     ];
 
     private const char Separator = ';';
@@ -65,10 +65,12 @@ public static class ThemeCasesCsv
         sampleCase.CaseNumber,
         sampleCase.CourtCode,
         sampleCase.JudgingBody,
+        null,
         sampleCase.CaseClass,
         sampleCase.CourtLevel,
         sampleCase.DecisionDate is { } date ? BrazilianDate(date) : null,
         sampleCase.Outcome,
+        null,
         sampleCase.Source,
         sampleCase.SourceLink,
         sampleCase.SourceLinkType,
