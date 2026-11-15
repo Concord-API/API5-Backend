@@ -1,4 +1,5 @@
 using System.Globalization;
+using Ratio.Application.Cases;
 
 namespace Ratio.Application.Abstractions;
 
@@ -25,6 +26,8 @@ public sealed record ThemeCases(long ThemeKey, IReadOnlyList<SampleCase> Cases, 
     public string Ordering { get; } = "julgamento mais recente primeiro; empate pelo número do processo; processos em sigilo no fim";
 
     public int Shown => Cases.Count;
+
+    public int ExportCeiling => ThemeCasesCsv.Ceiling;
 
     public string SampleLabel =>
         string.Format(Portuguese, "{0:N0} de {1:N0} {2}", Shown, Total, Total == 1 ? "decisão" : "decisões");
