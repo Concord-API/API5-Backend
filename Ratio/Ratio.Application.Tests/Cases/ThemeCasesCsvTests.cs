@@ -160,6 +160,42 @@ public class ThemeCasesCsvTests
         Assert.Equal("", cells[Array.IndexOf(header, "Valor fixado")]);
     }
 
+    private static SampleCase[] NumberedCases(int count) =>
+        Enumerable.Range(1, count).Select(index => PublicCase with { CaseNumber = $"CASE-{index:D5}" }).ToArray();
+
+    [Fact]
+    public void Declares_the_export_ceiling()
+    {
+        Assert.Equal(10_000, ThemeCasesCsv.Ceiling);
+    }
+
+    [Fact]
+    public void Writes_every_case_up_to_the_ceiling_without_a_cut_notice()
+    {
+        var csv = ThemeCasesCsv.Write(Loaded, NumberedCases(ThemeCasesCsv.Ceiling));
+
+        Assert.Equal(ThemeCasesCsv.Ceiling + 2, TableLines(csv).Length);
+        Assert.DoesNotContain(HeaderLines(csv), line => line.StartsWith("Teto da exportação", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cuts_the_cases_at_the_ceiling_keeping_the_first_ones()
+    {
+        var lines = TableLines(ThemeCasesCsv.Write(Loaded, NumberedCases(ThemeCasesCsv.Ceiling + 1)));
+
+        Assert.Equal(ThemeCasesCsv.Ceiling + 2, lines.Length);
+        Assert.StartsWith("CASE-00001;", lines[1]);
+        Assert.StartsWith("CASE-10000;", lines[^2]);
+    }
+
+    [Fact]
+    public void States_the_ceiling_and_the_total_above_the_table_when_it_cuts()
+    {
+        var lines = HeaderLines(ThemeCasesCsv.Write(Loaded, NumberedCases(12418)));
+
+        Assert.Equal("Teto da exportação;10.000 de 12.418 decisões", lines[^1]);
+    }
+
     [Theory]
     [InlineData("Câmara; Seção", "\"Câmara; Seção\"")]
     [InlineData("Câmara \"A\"", "\"Câmara \"\"A\"\"\"")]
