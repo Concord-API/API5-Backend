@@ -51,10 +51,10 @@ public class ThemeExportControllerTests(ApiFactory factory) : IClassFixture<ApiF
                 "Data de extração;28/08/2026",
                 "Escopo;cível · TJMG, TJRJ e TJSP",
                 "",
-                "Processo;Tribunal;Órgão julgador;Classe;Grau;Data do julgamento;Resultado;Fonte;Link;Tipo do link;Sigilo",
-                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;Apelação Cível;Second;15/06/2025;" +
-                "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
-                ";;;;;;;;;;sim",
+                "Processo;Tribunal;Órgão julgador;Relator;Classe;Grau;Data do julgamento;Resultado;Valor fixado;Fonte;Link;Tipo do link;Sigilo",
+                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;;Apelação Cível;Second;15/06/2025;" +
+                "Procedente;;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
+                ";;;;;;;;;;;;sim",
                 ""
             ],
             lines);

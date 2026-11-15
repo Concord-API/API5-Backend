@@ -6,7 +6,7 @@ namespace Ratio.Application.Tests.Cases;
 public class ThemeCasesCsvTests
 {
     private const string Header =
-        "Processo;Tribunal;Órgão julgador;Classe;Grau;Data do julgamento;Resultado;Fonte;Link;Tipo do link;Sigilo";
+        "Processo;Tribunal;Órgão julgador;Relator;Classe;Grau;Data do julgamento;Resultado;Valor fixado;Fonte;Link;Tipo do link;Sigilo";
 
     private static readonly SampleCase PublicCase = new(
         "0001234-56.2024.8.26.0100",
@@ -109,8 +109,8 @@ public class ThemeCasesCsvTests
         Assert.Equal(
             [
                 Header,
-                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;Apelação Cível;Second;15/06/2025;" +
-                "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
+                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;;Apelação Cível;Second;15/06/2025;" +
+                "Procedente;;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
                 ""
             ],
             lines);
@@ -136,8 +136,8 @@ public class ThemeCasesCsvTests
         var lines = TableLines(ThemeCasesCsv.Write(Loaded, [PublicCase with { JudgingBody = null, DecisionDate = null }]));
 
         Assert.Equal(
-            "0001234-56.2024.8.26.0100;TJSP;;Apelação Cível;Second;;" +
-            "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
+            "0001234-56.2024.8.26.0100;TJSP;;;Apelação Cível;Second;;" +
+            "Procedente;;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
             lines[1]);
     }
 
@@ -146,7 +146,18 @@ public class ThemeCasesCsvTests
     {
         var lines = TableLines(ThemeCasesCsv.Write(Loaded, [SampleCase.SealedCase]));
 
-        Assert.Equal(";;;;;;;;;;sim", lines[1]);
+        Assert.Equal(";;;;;;;;;;;;sim", lines[1]);
+    }
+
+    [Fact]
+    public void Leaves_the_reporter_and_the_amount_as_empty_columns()
+    {
+        var csv = ThemeCasesCsv.Write(Loaded, [PublicCase]);
+        var header = TableLines(csv)[0].Split(';');
+        var cells = TableLines(csv)[1].Split(';');
+
+        Assert.Equal("", cells[Array.IndexOf(header, "Relator")]);
+        Assert.Equal("", cells[Array.IndexOf(header, "Valor fixado")]);
     }
 
     [Theory]
@@ -158,6 +169,6 @@ public class ThemeCasesCsvTests
     {
         var csv = ThemeCasesCsv.Write(Loaded, [PublicCase with { JudgingBody = judgingBody }]);
 
-        Assert.Contains($";TJSP;{expected};Apelação Cível;", csv);
+        Assert.Contains($";TJSP;{expected};;Apelação Cível;", csv);
     }
 }
