@@ -6,7 +6,11 @@ namespace Ratio.Application.Cases;
 
 public static class ThemeCasesCsv
 {
+    public const int Ceiling = 10_000;
+
     private const string LineBreak = "\r\n";
+
+    private static readonly CultureInfo Portuguese = CultureInfo.GetCultureInfo("pt-BR");
 
     private static readonly string[] Header =
     [
@@ -22,7 +26,7 @@ public static class ThemeCasesCsv
     {
         var csv = new StringBuilder();
 
-        foreach (var line in HeaderLines(header))
+        foreach (var line in HeaderLines(header, cases.Count))
         {
             AppendLine(csv, line);
         }
@@ -30,7 +34,7 @@ public static class ThemeCasesCsv
         csv.Append(LineBreak);
         AppendLine(csv, Header);
 
-        foreach (var sampleCase in cases)
+        foreach (var sampleCase in cases.Take(Ceiling))
         {
             AppendLine(csv, Cells(sampleCase));
         }
@@ -38,7 +42,7 @@ public static class ThemeCasesCsv
         return csv.ToString();
     }
 
-    private static IEnumerable<string?[]> HeaderLines(ExportHeader header)
+    private static IEnumerable<string?[]> HeaderLines(ExportHeader header, int total)
     {
         if (header.Sources.Count == 0)
         {
@@ -53,6 +57,11 @@ public static class ThemeCasesCsv
         }
 
         yield return ["Escopo", ScopeText(header.Scope)];
+
+        if (total > Ceiling)
+        {
+            yield return ["Teto da exportação", string.Format(Portuguese, "{0:N0} de {1:N0} decisões", Ceiling, total)];
+        }
     }
 
     private static string ScopeText(Scope scope) =>
