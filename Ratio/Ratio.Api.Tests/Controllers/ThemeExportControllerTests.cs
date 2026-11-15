@@ -61,6 +61,16 @@ public class ThemeExportControllerTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [Fact]
+    public async Task Returns_the_export_ceiling_with_the_file()
+    {
+        Returns(417, Cases);
+
+        var response = await _client.GetAsync("/api/themes/417/export");
+
+        Assert.Equal(["10000"], response.Headers.GetValues("X-Export-Ceiling"));
+    }
+
+    [Fact]
     public async Task Starts_the_file_with_a_utf8_byte_order_mark()
     {
         Returns(416, Cases);
