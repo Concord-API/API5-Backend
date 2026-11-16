@@ -26,7 +26,8 @@ public class ThemePrecedentsControllerTests(ApiFactory factory) : IClassFixture<
                 new DateOnly(2016, 12, 14),
                 "Segunda Seção",
                 "https://processo.stj.jus.br/repetitivos/temas_repetitivos/pesquisa.jsp?novaConsulta=true&tipo_pesquisa=T&cod_tema_inicial=952&cod_tema_final=952")
-        ]);
+        ],
+        1);
 
     [Fact]
     public async Task Returns_the_theses_of_the_theme_with_their_source()

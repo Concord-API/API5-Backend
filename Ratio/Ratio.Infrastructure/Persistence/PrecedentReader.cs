@@ -44,7 +44,8 @@ public sealed class PrecedentReader(NpgsqlDataSource dataSource) : IPrecedentRea
         return new ThemePrecedents(
             themeKey,
             new PrecedentSource(SourceName, SourceUrl, extractedAt),
-            rows.Select(Map).ToArray());
+            rows.Select(Map).ToArray(),
+            rows.Length);
     }
 
     private static ThemePrecedent Map(PrecedentRow row) =>
