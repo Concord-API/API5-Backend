@@ -30,7 +30,12 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
             connectionString,
             NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
 
-        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql"], appliedScripts);
+        Assert.Equal(
+            [
+                "Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V025__court_rulings.sql"
+            ],
+            appliedScripts);
 
         await using var verification = new NpgsqlConnection(connectionString);
         await verification.OpenAsync();
@@ -38,14 +43,16 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         var preservedRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_theme WHERE theme_key = 900001");
         var journalRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql'");
+            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname IN " +
+            "('Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql', " +
+            "'Ratio.Infrastructure.Migrations.Scripts.V025__court_rulings.sql')");
         var materializedViewRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM pg_matviews WHERE schemaname = 'dw' AND matviewname = 'theme_appeal_by_instance'");
         var uniqueIndexRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'dw' AND indexname = 'idx_theme_appeal_by_instance_pk'");
 
         Assert.Equal(1, preservedRows);
-        Assert.Equal(1, journalRows);
+        Assert.Equal(2, journalRows);
         Assert.Equal(1, materializedViewRows);
         Assert.Equal(1, uniqueIndexRows);
     }
