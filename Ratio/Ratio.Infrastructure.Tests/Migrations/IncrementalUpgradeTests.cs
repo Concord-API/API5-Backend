@@ -16,7 +16,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
     {
         var connectionString = await postgres.CreateDatabaseAsync();
 
-        await ApplyMigrationsThroughAsync(connectionString, 23);
+        await ApplyMigrationsThroughAsync(connectionString, 24);
 
         await using (var connection = new NpgsqlConnection(connectionString))
         {
@@ -24,13 +24,16 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
             await connection.ExecuteAsync(
                 "INSERT INTO dw.dim_theme (theme_name, subject_area, theme_key) VALUES (@Name, @Area, @Key)",
                 new { Name = "Existing theme", Area = "CIVIL", Key = 900001L });
+            await connection.ExecuteAsync(
+                "INSERT INTO dw.dim_precedent (precedent_kind, precedent_number, thesis, status, source_url, extracted_at) " +
+                "VALUES ('Tema', 952, 'O reajuste por faixa etária é válido.', 'Trânsito em Julgado', 'https://stj.jus.br', now())");
         }
 
         var appliedScripts = await new DatabaseMigrator(
             connectionString,
             NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
 
-        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql"], appliedScripts);
+        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V025__qualified_precedent_attributes.sql"], appliedScripts);
 
         await using var verification = new NpgsqlConnection(connectionString);
         await verification.OpenAsync();
@@ -38,16 +41,13 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         var preservedRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_theme WHERE theme_key = 900001");
         var journalRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql'");
-        var materializedViewRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM pg_matviews WHERE schemaname = 'dw' AND matviewname = 'theme_appeal_by_instance'");
-        var uniqueIndexRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'dw' AND indexname = 'idx_theme_appeal_by_instance_pk'");
+            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V025__qualified_precedent_attributes.sql'");
+        var precedentType = await verification.ExecuteScalarAsync<string>(
+            "SELECT precedent_type FROM dw.dim_precedent WHERE precedent_kind = 'Tema' AND precedent_number = 952");
 
         Assert.Equal(1, preservedRows);
         Assert.Equal(1, journalRows);
-        Assert.Equal(1, materializedViewRows);
-        Assert.Equal(1, uniqueIndexRows);
+        Assert.Equal("tema_repetitivo", precedentType);
     }
 
     private static async Task ApplyMigrationsThroughAsync(string connectionString, int version)

@@ -60,7 +60,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V021__theme_case_sample.sql",
         "V022__materialize_theme_provenance.sql",
         "V023__stj_precedents.sql",
-        "V024__theme_appeal_by_instance.sql"
+        "V024__theme_appeal_by_instance.sql",
+        "V025__qualified_precedent_attributes.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
