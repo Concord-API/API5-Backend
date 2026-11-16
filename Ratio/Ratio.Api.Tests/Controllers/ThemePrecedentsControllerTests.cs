@@ -40,6 +40,9 @@ public class ThemePrecedentsControllerTests(ApiFactory factory) : IClassFixture<
         Assert.Equal(412, body.GetProperty("themeKey").GetInt64());
         Assert.Equal("STJ, Precedentes qualificados", body.GetProperty("source").GetProperty("name").GetString());
         Assert.Equal("2026-10-20T10:00:00+00:00", body.GetProperty("source").GetProperty("extractedAt").GetString());
+        Assert.Equal(1, body.GetProperty("shown").GetInt32());
+        Assert.Equal(1, body.GetProperty("total").GetInt32());
+        Assert.Equal("1 de 1 decisão", body.GetProperty("sampleLabel").GetString());
         var thesis = Assert.Single(body.GetProperty("precedents").EnumerateArray());
         Assert.Equal("Tema", thesis.GetProperty("kind").GetString());
         Assert.Equal(952, thesis.GetProperty("number").GetInt32());
