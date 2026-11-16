@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Application.Abstractions;
@@ -32,6 +33,8 @@ public class ThemeExportController(
         var provenance = ProvenanceCatalog.Describe(await provenanceReader.GetThemeAsync(key, cancellationToken));
         var scope = DeclaredScope.Describe(await scopeReader.GetCourtsAsync(cancellationToken));
         var header = new ExportHeader(provenance.Sources.Where(source => source.Block == "cases").ToArray(), scope);
+
+        Response.Headers["X-Export-Ceiling"] = ThemeCasesCsv.Ceiling.ToString(CultureInfo.InvariantCulture);
 
         byte[] content = [.. Encoding.UTF8.Preamble, .. Encoding.UTF8.GetBytes(ThemeCasesCsv.Write(header, cases))];
 

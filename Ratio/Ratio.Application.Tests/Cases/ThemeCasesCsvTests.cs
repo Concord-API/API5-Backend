@@ -6,7 +6,7 @@ namespace Ratio.Application.Tests.Cases;
 public class ThemeCasesCsvTests
 {
     private const string Header =
-        "Processo;Tribunal;Órgão julgador;Classe;Grau;Data do julgamento;Resultado;Fonte;Link;Tipo do link;Sigilo";
+        "Processo;Tribunal;Órgão julgador;Relator;Classe;Grau;Data do julgamento;Resultado;Valor fixado;Fonte;Link;Tipo do link;Sigilo";
 
     private static readonly SampleCase PublicCase = new(
         "0001234-56.2024.8.26.0100",
@@ -109,8 +109,8 @@ public class ThemeCasesCsvTests
         Assert.Equal(
             [
                 Header,
-                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;Apelação Cível;Second;15/06/2025;" +
-                "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
+                "0001234-56.2024.8.26.0100;TJSP;5ª Câmara de Direito Privado;;Apelação Cível;Second;15/06/2025;" +
+                "Procedente;;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
                 ""
             ],
             lines);
@@ -136,8 +136,8 @@ public class ThemeCasesCsvTests
         var lines = TableLines(ThemeCasesCsv.Write(Loaded, [PublicCase with { JudgingBody = null, DecisionDate = null }]));
 
         Assert.Equal(
-            "0001234-56.2024.8.26.0100;TJSP;;Apelação Cível;Second;;" +
-            "Procedente;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
+            "0001234-56.2024.8.26.0100;TJSP;;;Apelação Cível;Second;;" +
+            "Procedente;;datajud;https://esaj.tjsp.jus.br/cpopg/open.do;portal;não",
             lines[1]);
     }
 
@@ -146,7 +146,54 @@ public class ThemeCasesCsvTests
     {
         var lines = TableLines(ThemeCasesCsv.Write(Loaded, [SampleCase.SealedCase]));
 
-        Assert.Equal(";;;;;;;;;;sim", lines[1]);
+        Assert.Equal(";;;;;;;;;;;;sim", lines[1]);
+    }
+
+    [Fact]
+    public void Leaves_the_reporter_and_the_amount_as_empty_columns()
+    {
+        var csv = ThemeCasesCsv.Write(Loaded, [PublicCase]);
+        var header = TableLines(csv)[0].Split(';');
+        var cells = TableLines(csv)[1].Split(';');
+
+        Assert.Equal("", cells[Array.IndexOf(header, "Relator")]);
+        Assert.Equal("", cells[Array.IndexOf(header, "Valor fixado")]);
+    }
+
+    private static SampleCase[] NumberedCases(int count) =>
+        Enumerable.Range(1, count).Select(index => PublicCase with { CaseNumber = $"CASE-{index:D5}" }).ToArray();
+
+    [Fact]
+    public void Declares_the_export_ceiling()
+    {
+        Assert.Equal(10_000, ThemeCasesCsv.Ceiling);
+    }
+
+    [Fact]
+    public void Writes_every_case_up_to_the_ceiling_without_a_cut_notice()
+    {
+        var csv = ThemeCasesCsv.Write(Loaded, NumberedCases(ThemeCasesCsv.Ceiling));
+
+        Assert.Equal(ThemeCasesCsv.Ceiling + 2, TableLines(csv).Length);
+        Assert.DoesNotContain(HeaderLines(csv), line => line.StartsWith("Teto da exportação", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Cuts_the_cases_at_the_ceiling_keeping_the_first_ones()
+    {
+        var lines = TableLines(ThemeCasesCsv.Write(Loaded, NumberedCases(ThemeCasesCsv.Ceiling + 1)));
+
+        Assert.Equal(ThemeCasesCsv.Ceiling + 2, lines.Length);
+        Assert.StartsWith("CASE-00001;", lines[1]);
+        Assert.StartsWith("CASE-10000;", lines[^2]);
+    }
+
+    [Fact]
+    public void States_the_ceiling_and_the_total_above_the_table_when_it_cuts()
+    {
+        var lines = HeaderLines(ThemeCasesCsv.Write(Loaded, NumberedCases(12418)));
+
+        Assert.Equal("Teto da exportação;10.000 de 12.418 decisões", lines[^1]);
     }
 
     [Theory]
@@ -158,6 +205,6 @@ public class ThemeCasesCsvTests
     {
         var csv = ThemeCasesCsv.Write(Loaded, [PublicCase with { JudgingBody = judgingBody }]);
 
-        Assert.Contains($";TJSP;{expected};Apelação Cível;", csv);
+        Assert.Contains($";TJSP;{expected};;Apelação Cível;", csv);
     }
 }
