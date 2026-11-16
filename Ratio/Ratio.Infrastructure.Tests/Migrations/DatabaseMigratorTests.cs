@@ -14,6 +14,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "bridge_case_subject",
         "bridge_subject_doctrine",
         "bridge_subject_precedent",
+        "bridge_theme_ruling",
         "bridge_theme_subject",
         "dim_case",
         "dim_case_class",
@@ -24,6 +25,7 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "dim_judging_body",
         "dim_movement",
         "dim_precedent",
+        "dim_ruling",
         "dim_subject",
         "dim_theme",
         "fact_case_event",
@@ -60,7 +62,8 @@ public class DatabaseMigratorTests(PostgresFixture postgres) : IClassFixture<Pos
         "V021__theme_case_sample.sql",
         "V022__materialize_theme_provenance.sql",
         "V023__stj_precedents.sql",
-        "V024__theme_appeal_by_instance.sql"
+        "V024__theme_appeal_by_instance.sql",
+        "V025__court_rulings.sql"
     ];
 
     private static string[] ScriptFileNames(IEnumerable<string> names) =>
