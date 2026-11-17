@@ -8,7 +8,16 @@ public sealed record ThemePrecedent(
     string Status,
     DateOnly? JudgedAt,
     string? JudgingBody,
-    string Link);
+    string Link)
+{
+    public string? Type { get; init; }
+
+    public DateOnly? StatusDate { get; init; }
+
+    public bool? SuspendsCases { get; init; }
+
+    public IReadOnlyList<string> LeadingCases { get; init; } = [];
+}
 
 public sealed record PrecedentSource(string Name, string Url, DateTimeOffset? ExtractedAt);
 
