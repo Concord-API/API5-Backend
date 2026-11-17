@@ -20,7 +20,9 @@ public class RulingReaderTests(PostgresFixture postgres) : IClassFixture<Postgre
             "INSERT INTO dw.dim_theme (theme_name, theme_key) VALUES ('Planos de saúde', 412), ('Sem acórdão', 413); " +
             "INSERT INTO dw.dim_ruling (source, source_id, case_number, court_code, judging_body, judged_at, summary, source_url, extracted_at) VALUES " +
             "('stj_rulings', '2', '0000002-00.2020.3.00.0000', 'STJ', 'Segunda Seção', '2025-02-10', 'Ementa mais recente.', 'https://processo.stj.jus.br/2', '2026-11-01T10:00:00Z'), " +
-            "('stj_rulings', '1', '0000001-00.2020.3.00.0000', 'STJ', 'Terceira Turma', '2024-01-05', 'Ementa anterior.', 'https://processo.stj.jus.br/1', '2026-11-01T10:00:00Z'); " +
+            "('stj_rulings', '3', '0000003-00.2020.3.00.0000', 'STJ', 'Primeira Seção', '2025-02-10', 'Ementa no mesmo dia.', 'https://processo.stj.jus.br/3', '2026-11-01T10:00:00Z'), " +
+            "('stj_rulings', '1', '0000001-00.2020.3.00.0000', 'STJ', 'Terceira Turma', '2024-01-05', 'Ementa anterior.', 'https://processo.stj.jus.br/1', '2026-11-01T10:00:00Z'), " +
+            "('stj_rulings', '4', NULL, 'STJ', NULL, NULL, 'Ementa sem data de julgamento.', 'https://processo.stj.jus.br/4', '2026-11-01T10:00:00Z'); " +
             "INSERT INTO dw.bridge_theme_ruling (theme_sk, ruling_sk, link_method) " +
             "SELECT t.theme_sk, r.ruling_sk, 'cnj_exact' FROM dw.dim_theme t CROSS JOIN dw.dim_ruling r WHERE t.theme_key = 412");
         await command.ExecuteNonQueryAsync();
@@ -33,9 +35,11 @@ public class RulingReaderTests(PostgresFixture postgres) : IClassFixture<Postgre
     {
         var result = await _reader.ListAsync(412, 20, CancellationToken.None);
 
-        Assert.Equal(["2", "1"], result!.Rulings.Select(ruling => ruling.SourceId));
-        Assert.Equal(2, result.Total);
-        Assert.Equal("2 de 2 decisões", result.SampleLabel);
+        Assert.Equal(["2", "3", "1", "4"], result!.Rulings.Select(ruling => ruling.SourceId));
+        Assert.Equal(4, result.Total);
+        Assert.Equal("4 de 4 decisões", result.SampleLabel);
+        Assert.Equal("julgamento mais recente primeiro; empate pelo tribunal e identificador da fonte", result.Ordering);
+        Assert.Null(result.Rulings[^1].JudgedAt);
         Assert.Equal("STJ, Espelhos de acórdãos", result.Source.Name);
     }
 
@@ -47,6 +51,9 @@ public class RulingReaderTests(PostgresFixture postgres) : IClassFixture<Postgre
         Assert.NotNull(result);
         Assert.Empty(result.Rulings);
         Assert.Equal(0, result.Total);
+        Assert.Equal(0, result.Shown);
+        Assert.Equal("0 de 0 decisões", result.SampleLabel);
+        Assert.Null(result.Source.ExtractedAt);
     }
 
     [Fact]
