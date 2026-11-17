@@ -20,6 +20,8 @@ public class PrecedentReaderTests(PostgresFixture postgres) : IClassFixture<Post
         "('Tema', 952, 'O reajuste por faixa etária é válido.', 'Reajuste por faixa etária', 'Trânsito em Julgado', '2016-12-14', 'S2', '" + Url + "952&cod_tema_final=952', '2026-10-20T10:00:00Z'), " +
         "('Tema', 1016, 'A tese do Tema 952 vale para os planos coletivos.', NULL, 'Acórdão Publicado', '2022-03-23', 'S2', '" + Url + "1016&cod_tema_final=1016', '2026-10-20T10:00:00Z'), " +
         "('Tema', 1200, 'Tese sem data de julgamento.', NULL, 'Afetado', NULL, NULL, '" + Url + "1200&cod_tema_final=1200', '2026-10-20T10:00:00Z'); " +
+        "UPDATE dw.dim_precedent SET precedent_type = 'tema_repetitivo', status_date = '2017-03-02', suspends_cases = true, " +
+        "leading_cases = ARRAY['REsp 1568244/RJ', 'REsp 1280211/SP'] WHERE precedent_number = 952; " +
         "INSERT INTO dw.bridge_subject_precedent (subject_sk, precedent_sk) " +
         "SELECT s.subject_sk, p.precedent_sk FROM dw.dim_subject s CROSS JOIN dw.dim_precedent p " +
         "WHERE s.subject_code IN (6233, 7771);";
@@ -63,8 +65,27 @@ public class PrecedentReaderTests(PostgresFixture postgres) : IClassFixture<Post
                 "Trânsito em Julgado",
                 new DateOnly(2016, 12, 14),
                 "Segunda Seção",
-                Url + "952&cod_tema_final=952"),
+                Url + "952&cod_tema_final=952")
+            {
+                Type = "tema_repetitivo",
+                StatusDate = new DateOnly(2017, 3, 2),
+                SuspendsCases = true,
+                LeadingCases = thesis.LeadingCases
+            },
             thesis);
+        Assert.Equal(["REsp 1568244/RJ", "REsp 1280211/SP"], thesis.LeadingCases);
+    }
+
+    [Fact]
+    public async Task Leaves_the_attributes_unknown_when_the_source_omits_them()
+    {
+        var result = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        var thesis = result!.Precedents.Single(precedent => precedent.Number == 1200);
+        Assert.Null(thesis.Type);
+        Assert.Null(thesis.StatusDate);
+        Assert.Null(thesis.SuspendsCases);
+        Assert.Empty(thesis.LeadingCases);
     }
 
     [Fact]
