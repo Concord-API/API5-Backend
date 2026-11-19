@@ -532,6 +532,57 @@ Describe 'Get-RandomPassword' {
     }
 }
 
+Describe 'Get-LoadTestArgument' {
+    It 'manda as métricas ao Prometheus por remote write' {
+        $run = Get-LoadTestArgument -ScriptPath 'C:\k6\load.ts'
+        $index = [array]::IndexOf($run.Arguments, '-o')
+        $run.Arguments[$index + 1] | Should -Be 'experimental-prometheus-rw'
+        $run.Environment['K6_PROMETHEUS_RW_SERVER_URL'] | Should -Be 'http://127.0.0.1:9090/api/v1/write'
+    }
+
+    It 'usa o endereço de remote write informado' {
+        $run = Get-LoadTestArgument -ScriptPath 'C:\k6\load.ts' -RemoteWriteUrl 'http://10.0.0.5:9090/api/v1/write'
+        $run.Environment['K6_PROMETHEUS_RW_SERVER_URL'] | Should -Be 'http://10.0.0.5:9090/api/v1/write'
+    }
+
+    It 'grava o P95, o P99, a média e o máximo do tempo de resposta' {
+        $run = Get-LoadTestArgument -ScriptPath 'C:\k6\load.ts'
+        $run.Environment['K6_PROMETHEUS_RW_TREND_STATS'] | Should -Be 'p(95),p(99),avg,max'
+    }
+
+    It 'marca a execução com o testid informado' {
+        $run = Get-LoadTestArgument -ScriptPath 'C:\k6\load.ts' -TestId 'ensaio-1'
+        $run.TestId | Should -Be 'ensaio-1'
+        $index = [array]::IndexOf($run.Arguments, '--tag')
+        $run.Arguments[$index + 1] | Should -Be 'testid=ensaio-1'
+    }
+
+    It 'gera o testid com a data e a hora quando nenhum é informado' {
+        $run = Get-LoadTestArgument -ScriptPath 'C:\k6\load.ts'
+        $run.TestId | Should -Match '^\d{8}-\d{6}$'
+        $run.Arguments | Should -Contain "testid=$($run.TestId)"
+    }
+
+    It 'aponta o teste para <Expected>' -TestCases @(
+        @{ BaseUrl = $null; Expected = 'http://127.0.0.1' },
+        @{ BaseUrl = 'http://homologacao'; Expected = 'http://homologacao' }
+    ) {
+        $parameters = @{ ScriptPath = 'C:\k6\load.ts' }
+        if ($BaseUrl) {
+            $parameters.BaseUrl = $BaseUrl
+        }
+        $run = Get-LoadTestArgument @parameters
+        $index = [array]::IndexOf($run.Arguments, '--env')
+        $run.Arguments[$index + 1] | Should -Be "BASE_URL=$Expected"
+    }
+
+    It 'passa o script do k6 por último' {
+        $run = Get-LoadTestArgument -ScriptPath 'C:\k6\load.ts'
+        $run.Arguments[0] | Should -Be 'run'
+        $run.Arguments[-1] | Should -Be 'C:\k6\load.ts'
+    }
+}
+
 Describe 'Merge-EnvironmentEntry' {
     It 'acrescenta a variável às que o serviço já tem' {
         Merge-EnvironmentEntry -Entries @('ALLOY_DEPLOY_MODE=windows') -Name 'RATIO_MONITOR_DSN' -Value 'postgresql://x' |
