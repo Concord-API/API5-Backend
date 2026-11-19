@@ -7,11 +7,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'Observability.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'LoadTest.psm1') -Force
+Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'observability/Observability.psm1') -Force
 
 $k6 = Find-K6Executable -Path $K6Path
 if (-not $ScriptPath) {
-    $ScriptPath = Get-DefaultLoadTestScript -ObservabilityPath $PSScriptRoot
+    $ScriptPath = Join-Path $PSScriptRoot 'load.ts'
 }
 if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf)) {
     throw "O script do k6 não foi encontrado em $ScriptPath. Rode a partir de um clone do API5-Backend ou informe -ScriptPath."

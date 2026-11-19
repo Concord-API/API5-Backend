@@ -6,11 +6,13 @@ on:
     paths:
       - .github/workflows/observability.yml
       - observability/**
+      - acceptance/k6/**
   push:
     branches: [main]
     paths:
       - .github/workflows/observability.yml
       - observability/**
+      - acceptance/k6/**
   workflow_dispatch:
 
 permissions:
@@ -52,11 +54,11 @@ jobs:
       - name: Run the Pester tests
         run: |
           Import-Module Pester -RequiredVersion 5.7.1
-          Invoke-Pester -Path observability/tests -CI
+          Invoke-Pester -Path observability/tests, acceptance/k6/tests -CI
       - name: Analyze the scripts for Windows PowerShell 5.1
         run: |
           Import-Module PSScriptAnalyzer -RequiredVersion 1.24.0
-          $findings = foreach ($file in Get-ChildItem observability/*.ps1, observability/*.psm1) {
+          $findings = foreach ($file in Get-ChildItem observability/*.ps1, observability/*.psm1, acceptance/k6/*.ps1, acceptance/k6/*.psm1) {
             Invoke-ScriptAnalyzer -Path $file.FullName -Settings observability/PSScriptAnalyzerSettings.psd1
           }
           $findings | Format-Table RuleName, ScriptName, Line, Message -AutoSize -Wrap
