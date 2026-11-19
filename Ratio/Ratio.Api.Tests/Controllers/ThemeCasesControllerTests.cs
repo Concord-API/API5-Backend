@@ -60,6 +60,18 @@ public class ThemeCasesControllerTests(ApiFactory factory) : IClassFixture<ApiFa
     }
 
     [Fact]
+    public async Task Returns_the_export_ceiling_with_the_sample()
+    {
+        factory.ThemeCasesReader
+            .Setup(reader => reader.ListCasesAsync(420, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Cases with { ThemeKey = 420 });
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/420/cases");
+
+        Assert.Equal(10000, body.GetProperty("exportCeiling").GetInt32());
+    }
+
+    [Fact]
     public async Task Returns_a_sealed_case_flagged_and_without_data()
     {
         factory.ThemeCasesReader

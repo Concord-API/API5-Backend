@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Ratio.Api.Observability;
 using Ratio.Application.Abstractions;
+using Ratio.Application.Citations;
 using Ratio.Application.Coverage;
 using Ratio.Application.DataSources;
 using Ratio.Application.Filters;
@@ -54,7 +55,8 @@ public class ThemesController(
             Unavailable = unavailable,
             Provenance = provenance,
             RelatedDoctrine = relatedDoctrine,
-            Scope = scope
+            Scope = scope,
+            Citation = ThemeCitation.Compose(theme with { Summary = summary }, provenance, scope)
         });
     }
 

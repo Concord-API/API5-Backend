@@ -191,6 +191,40 @@ public class ThemesControllerTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal("notLoaded", summary.GetProperty("reason").GetString());
     }
 
+    [Fact]
+    public async Task Returns_the_citation_with_the_theme()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(440, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 440 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(440, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedCasesAndDoctrine);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/440");
+
+        Assert.Equal(
+            "Inscrição indevida em cadastro de inadimplentes — Em 98,6% das 144 decisões julgadas, houve acolhimento da pretensão do autor. "
+            + "Fonte: DataJud/CNJ, 12.418 processos, extração de 28.08.2026. "
+            + "Escopo: TJMG, TJRJ e TJSP, matéria cível. Metodologia 1.0.",
+            body.GetProperty("citation").GetString());
+    }
+
+    [Fact]
+    public async Task Returns_no_citation_when_the_cases_have_no_provenance()
+    {
+        factory.ThemeDetailReader
+            .Setup(reader => reader.GetThemeAsync(441, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WrongfulListingDetail with { ThemeKey = 441 });
+        factory.ProvenanceReader
+            .Setup(reader => reader.GetThemeAsync(441, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LoadedProvenance.Empty);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/441");
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("citation").ValueKind);
+    }
+
     private static readonly LoadedProvenance LoadedCasesAndDoctrine = new(
         [
             .. LoadedCases.Sources,
