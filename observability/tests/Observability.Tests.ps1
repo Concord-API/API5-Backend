@@ -583,6 +583,41 @@ Describe 'Get-LoadTestArgument' {
     }
 }
 
+Describe 'Find-K6Executable' {
+    It 'usa o caminho informado quando o arquivo existe' {
+        $k6 = New-Artifact -Name 'k6.exe' -Content 'k6'
+        Find-K6Executable -Path $k6 | Should -Be $k6
+    }
+
+    It 'recusa o caminho informado quando o arquivo não existe' {
+        { Find-K6Executable -Path (Join-Path $TestDrive 'nao-existe.exe') } | Should -Throw '*nao-existe.exe*'
+    }
+
+    It 'procura o k6 no PATH quando nenhum caminho é informado' {
+        Mock -ModuleName Observability Get-Command { [pscustomobject] @{ Source = 'C:\Tools\k6.exe' } } -ParameterFilter { $Name -eq 'k6' }
+        Find-K6Executable | Should -Be 'C:\Tools\k6.exe'
+    }
+
+    It 'explica como resolver quando o k6 não está no PATH' {
+        Mock -ModuleName Observability Get-Command { $null } -ParameterFilter { $Name -eq 'k6' }
+        { Find-K6Executable } | Should -Throw '*-K6Path*'
+    }
+}
+
+Describe 'Invoke-LoadTest.ps1' {
+    It 'usa por padrão o load.ts do teste de aceitação' {
+        $script = Join-Path $PSScriptRoot '..' 'Invoke-LoadTest.ps1'
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref] $null, [ref] $null)
+        $parameter = $ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'ScriptPath' }
+        $parameter.DefaultValue | Should -Not -BeNullOrEmpty
+        $folder = Split-Path -Parent $script
+        $expression = $parameter.DefaultValue.Extent.Text.Replace('$PSScriptRoot', "'$folder'")
+        $default = & ([scriptblock]::Create($expression))
+        $default | Should -Exist
+        Split-Path -Leaf $default | Should -Be 'load.ts'
+    }
+}
+
 Describe 'Merge-EnvironmentEntry' {
     It 'acrescenta a variável às que o serviço já tem' {
         Merge-EnvironmentEntry -Entries @('ALLOY_DEPLOY_MODE=windows') -Name 'RATIO_MONITOR_DSN' -Value 'postgresql://x' |
