@@ -606,7 +606,7 @@ Describe 'Find-K6Executable' {
 
 Describe 'Invoke-LoadTest.ps1' {
     It 'usa por padrão o load.ts do teste de aceitação' {
-        $script = Join-Path $PSScriptRoot '..' 'Invoke-LoadTest.ps1'
+        $script = (Resolve-Path -Path (Join-Path $PSScriptRoot '..' 'Invoke-LoadTest.ps1')).ProviderPath
         $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref] $null, [ref] $null)
         $parameter = $ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'ScriptPath' }
         $parameter.DefaultValue | Should -Not -BeNullOrEmpty

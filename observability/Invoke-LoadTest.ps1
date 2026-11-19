@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $K6Path,
-    [Parameter(Mandatory)] [string] $ScriptPath,
+    [string] $K6Path,
+    [string] $ScriptPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'acceptance/k6/load.ts'),
     [string] $BaseUrl = 'http://127.0.0.1',
     [string] $PrometheusUrl = 'http://127.0.0.1:9090'
 )
@@ -9,10 +9,9 @@ param(
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'Observability.psm1') -Force
 
-foreach ($path in $K6Path, $ScriptPath) {
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "Arquivo não encontrado: $path"
-    }
+$k6 = Find-K6Executable -Path $K6Path
+if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf)) {
+    throw "O script do k6 não foi encontrado em $ScriptPath. Rode a partir de um clone do API5-Backend ou informe -ScriptPath."
 }
 
 Wait-ComponentReady -Name 'Prometheus' -Uri "$PrometheusUrl/-/ready" -TimeoutSeconds 30
@@ -23,5 +22,5 @@ foreach ($variable in $run.Environment.GetEnumerator()) {
 }
 
 Write-Host "Execução do k6: $($run.TestId). No Grafana, painel Ratio · Carga, escolha essa execução."
-& $K6Path @($run.Arguments)
+& $k6 @($run.Arguments)
 exit $LASTEXITCODE

@@ -299,4 +299,27 @@ function Get-LoadTestArgument {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment, Get-LoadTestArgument
+function Find-K6Executable {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [string] $Path
+    )
+
+    if ($Path) {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            throw "O k6 não foi encontrado em $Path."
+        }
+
+        return $Path
+    }
+
+    $command = Get-Command -Name 'k6' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $command) {
+        throw 'O k6 não está no PATH. Instale o k6 (https://github.com/grafana/k6/releases) ou informe o caminho do k6.exe com -K6Path.'
+    }
+
+    $command.Source
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment, Get-LoadTestArgument, Find-K6Executable
