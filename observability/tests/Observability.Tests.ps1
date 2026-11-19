@@ -180,6 +180,11 @@ Describe 'custom.ini' {
         $settings['server.http_addr'] | Should -Be '127.0.0.1'
     }
 
+    It 'atende em /monitoramento/ atrás do proxy' {
+        $settings['server.root_url'] | Should -Be '%(protocol)s://%(domain)s/monitoramento/'
+        $settings['server.serve_from_sub_path'] | Should -Be 'true'
+    }
+
     It 'abre na Visão geral instalada' {
         $settings['dashboards.default_home_dashboard_path'] | Should -Be 'C:\ProgramData\Ratio\observability\grafana\dashboards\visao-geral.json'
     }
