@@ -322,4 +322,14 @@ function Find-K6Executable {
     $command.Source
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment, Get-LoadTestArgument, Find-K6Executable
+function Get-DefaultLoadTestScript {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [string] $ObservabilityPath
+    )
+
+    Join-Path (Split-Path -Parent $ObservabilityPath) 'acceptance/k6/load.ts'
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment, Get-LoadTestArgument, Find-K6Executable, Get-DefaultLoadTestScript

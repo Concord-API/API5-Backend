@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [string] $K6Path,
-    [string] $ScriptPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'acceptance/k6/load.ts'),
+    [string] $ScriptPath,
     [string] $BaseUrl = 'http://127.0.0.1',
     [string] $PrometheusUrl = 'http://127.0.0.1:9090'
 )
@@ -10,6 +10,9 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'Observability.psm1') -Force
 
 $k6 = Find-K6Executable -Path $K6Path
+if (-not $ScriptPath) {
+    $ScriptPath = Get-DefaultLoadTestScript -ObservabilityPath $PSScriptRoot
+}
 if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf)) {
     throw "O script do k6 não foi encontrado em $ScriptPath. Rode a partir de um clone do API5-Backend ou informe -ScriptPath."
 }
