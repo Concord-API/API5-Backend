@@ -16,7 +16,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
     {
         var connectionString = await postgres.CreateDatabaseAsync();
 
-        await ApplyMigrationsThroughAsync(connectionString, 24);
+        await ApplyMigrationsThroughAsync(connectionString, 25);
 
         await using (var connection = new NpgsqlConnection(connectionString))
         {
@@ -33,7 +33,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
             connectionString,
             NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
 
-        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V025__qualified_precedent_attributes.sql"], appliedScripts);
+        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V026__qualified_precedent_attributes.sql"], appliedScripts);
 
         await using var verification = new NpgsqlConnection(connectionString);
         await verification.OpenAsync();
@@ -41,7 +41,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         var preservedRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_theme WHERE theme_key = 900001");
         var journalRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V025__qualified_precedent_attributes.sql'");
+            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V026__qualified_precedent_attributes.sql'");
         var precedentType = await verification.ExecuteScalarAsync<string>(
             "SELECT precedent_type FROM dw.dim_precedent WHERE precedent_kind = 'Tema' AND precedent_number = 952");
 
