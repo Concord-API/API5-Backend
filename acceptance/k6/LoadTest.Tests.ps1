@@ -1,5 +1,5 @@
 ﻿BeforeAll {
-    Import-Module (Join-Path $PSScriptRoot '..' 'LoadTest.psm1') -Force
+    Import-Module (Join-Path $PSScriptRoot 'LoadTest.psm1') -Force
 
     function New-Artifact([string] $Name, [string] $Content) {
         $path = Join-Path $TestDrive $Name
@@ -87,12 +87,12 @@ Describe 'Find-K6Executable' {
 
 Describe 'Invoke-LoadTest.ps1' {
     BeforeAll {
-        $script = Join-Path $PSScriptRoot '..' 'Invoke-LoadTest.ps1'
+        $script = Join-Path $PSScriptRoot 'Invoke-LoadTest.ps1'
         $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref] $null, [ref] $null)
     }
 
     It 'tem ao lado o load.ts que roda por padrão' {
-        Join-Path $PSScriptRoot '..' 'load.ts' | Should -Exist
+        Join-Path $PSScriptRoot 'load.ts' | Should -Exist
     }
 
     It 'exige <Name> ao rodar o teste' -TestCases @(
