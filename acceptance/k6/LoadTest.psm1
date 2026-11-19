@@ -2,8 +2,8 @@
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [string] $ScriptPath,
-        [string] $BaseUrl = 'http://127.0.0.1',
-        [string] $RemoteWriteUrl = 'http://127.0.0.1:9090/api/v1/write',
+        [Parameter(Mandatory)] [string] $BaseUrl,
+        [Parameter(Mandatory)] [string] $RemoteWriteUrl,
         [string] $TestId = (Get-Date -Format 'yyyyMMdd-HHmmss')
     )
 
