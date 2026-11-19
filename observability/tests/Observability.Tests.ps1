@@ -307,8 +307,38 @@ Describe 'painéis do Grafana' {
         $expressions = @($targets | Where-Object { $_.Target.PSObject.Properties['expr'] })
     }
 
-    It 'tem os cinco painéis' {
-        $dashboards.File | Sort-Object | Should -Be @('api.json', 'banco.json', 'dados.json', 'servidor.json', 'visao-geral.json')
+    It 'tem os seis painéis' {
+        $dashboards.File | Sort-Object | Should -Be @('api.json', 'banco.json', 'carga.json', 'dados.json', 'servidor.json', 'visao-geral.json')
+    }
+
+    It 'deixa escolher no painel de carga a execução do k6' {
+        $load = ($dashboards | Where-Object { $_.File -eq 'carga.json' }).Json
+        $variable = $load.templating.list | Where-Object { $_.name -eq 'testid' }
+        $variable.type | Should -Be 'query'
+        $variable.datasource.uid | Should -Be 'prometheus'
+        $variable.query.query | Should -Be 'label_values(k6_vus, testid)'
+    }
+
+    It 'mostra no painel de carga <Metric>' -TestCases @(
+        @{ Metric = 'k6_vus' },
+        @{ Metric = 'k6_http_reqs_total' },
+        @{ Metric = 'k6_http_req_duration_p95' },
+        @{ Metric = 'k6_http_req_failed_rate' },
+        @{ Metric = 'k6_checks_rate' },
+        @{ Metric = 'http_server_request_duration_seconds_count' },
+        @{ Metric = 'http_server_request_duration_seconds_bucket' },
+        @{ Metric = 'pg_stat_database_numbackends' }
+    ) {
+        $found = @($expressions | Where-Object { $_.Where -like 'carga.json / *' -and $_.Target.expr -match "\b$Metric\b" })
+        $found.Count | Should -BeGreaterThan 0
+    }
+
+    It 'filtra o k6 pela execução escolhida' {
+        $k6 = @($expressions | Where-Object { $_.Target.expr -match '\bk6_' })
+        $k6.Count | Should -BeGreaterThan 0
+        foreach ($item in $k6) {
+            $item.Target.expr | Should -Match 'testid="\$testid"' -Because $item.Where
+        }
     }
 
     It 'dá a cada painel um uid único que começa com ratio-' {
