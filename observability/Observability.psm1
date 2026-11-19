@@ -280,4 +280,23 @@ function Set-ServiceEnvironment {
     }
 }
 
-Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment
+function Get-LoadTestArgument {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string] $ScriptPath,
+        [string] $BaseUrl = 'http://127.0.0.1',
+        [string] $RemoteWriteUrl = 'http://127.0.0.1:9090/api/v1/write',
+        [string] $TestId = (Get-Date -Format 'yyyyMMdd-HHmmss')
+    )
+
+    [pscustomobject] @{
+        TestId      = $TestId
+        Arguments   = [string[]] @('run', '--no-usage-report', '-o', 'experimental-prometheus-rw', '--tag', "testid=$TestId", '--env', "BASE_URL=$BaseUrl", $ScriptPath)
+        Environment = [ordered] @{
+            K6_PROMETHEUS_RW_SERVER_URL  = $RemoteWriteUrl
+            K6_PROMETHEUS_RW_TREND_STATS = 'p(95),p(99),avg,max'
+        }
+    }
+}
+
+Export-ModuleMember -Function Get-ObservabilityManifest, Test-ArtifactHash, Assert-ArtifactFolder, Wait-ComponentReady, Stop-ServiceIfPresent, Grant-LocalServiceWrite, Register-WinSWService, Invoke-Installer, Expand-TarArchive, Add-PreloadLibrary, Get-RandomPassword, Assert-GrafanaAdminPassword, Read-GrafanaAdminPassword, Set-GrafanaAdminPassword, Merge-EnvironmentEntry, Get-ServiceEnvironment, Set-ServiceEnvironment, Get-LoadTestArgument
