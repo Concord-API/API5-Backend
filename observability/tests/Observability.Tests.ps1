@@ -604,17 +604,22 @@ Describe 'Find-K6Executable' {
     }
 }
 
-Describe 'Invoke-LoadTest.ps1' {
-    It 'usa por padrão o load.ts do teste de aceitação' {
-        $script = (Resolve-Path -Path (Join-Path $PSScriptRoot '..' 'Invoke-LoadTest.ps1')).ProviderPath
-        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref] $null, [ref] $null)
-        $parameter = $ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'ScriptPath' }
-        $parameter.DefaultValue | Should -Not -BeNullOrEmpty
-        $folder = Split-Path -Parent $script
-        $expression = $parameter.DefaultValue.Extent.Text.Replace('$PSScriptRoot', "'$folder'")
-        $default = & ([scriptblock]::Create($expression))
+Describe 'Get-DefaultLoadTestScript' {
+    It 'aponta para o load.ts do teste de aceitação' {
+        $observability = (Resolve-Path -Path (Join-Path $PSScriptRoot '..')).ProviderPath
+        $default = Get-DefaultLoadTestScript -ObservabilityPath $observability
         $default | Should -Exist
         Split-Path -Leaf $default | Should -Be 'load.ts'
+    }
+}
+
+Describe 'Invoke-LoadTest.ps1' {
+    It 'não usa $PSScriptRoot nos valores padrão, que chega vazio no Windows PowerShell 5.1' {
+        $script = Join-Path $PSScriptRoot '..' 'Invoke-LoadTest.ps1'
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref] $null, [ref] $null)
+        foreach ($parameter in $ast.ParamBlock.Parameters | Where-Object { $_.DefaultValue }) {
+            $parameter.DefaultValue.Extent.Text | Should -Not -Match 'PSScriptRoot' -Because $parameter.Name.VariablePath.UserPath
+        }
     }
 }
 
