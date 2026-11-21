@@ -18,8 +18,12 @@ public static class DependencyInjection
         services.AddSingleton<IProvenanceReader, ProvenanceReader>();
         services.AddSingleton<IDoctrineReader, DoctrineReader>();
         services.AddSingleton<IScopeReader, ScopeReader>();
-        services.AddSingleton<ICourtCaseCountReader, CourtCaseCountReader>();
-        services.AddSingleton<ICourtLevelReader, CourtLevelReader>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<PublishedLoadVersion>();
+        services.AddSingleton<CourtCaseCountReader>();
+        services.AddSingleton<ICourtCaseCountReader, CachedCourtCaseCountReader>();
+        services.AddSingleton<CourtLevelReader>();
+        services.AddSingleton<ICourtLevelReader, CachedCourtLevelReader>();
         services.AddSingleton<IPanelAlignmentReader, PanelAlignmentReader>();
         services.AddSingleton<IThemeCasesReader, ThemeCasesReader>();
         services.AddSingleton<IPrecedentReader, PrecedentReader>();
