@@ -90,4 +90,26 @@ public class DependencyInjectionTests
 
         Assert.IsType<ThemeCasesReader>(provider.GetRequiredService<IThemeCasesReader>());
     }
+
+    [Fact]
+    public void Serves_the_court_levels_from_the_load_cache()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<CachedCourtLevelReader>(provider.GetRequiredService<ICourtLevelReader>());
+    }
+
+    [Fact]
+    public void Serves_the_court_case_counts_from_the_load_cache()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<CachedCourtCaseCountReader>(provider.GetRequiredService<ICourtCaseCountReader>());
+    }
 }
