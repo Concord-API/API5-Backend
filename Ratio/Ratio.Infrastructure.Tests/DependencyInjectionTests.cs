@@ -26,6 +26,30 @@ public class DependencyInjectionTests
     }
 
     [Fact]
+    public void Caps_the_connection_pool_at_40_when_the_connection_string_does_not_set_it()
+    {
+        var services = new ServiceCollection();
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        var dataSource = provider.GetRequiredService<NpgsqlDataSource>();
+
+        Assert.Equal(40, new NpgsqlConnectionStringBuilder(dataSource.ConnectionString).MaxPoolSize);
+    }
+
+    [Fact]
+    public void Keeps_the_pool_size_set_in_the_connection_string()
+    {
+        var services = new ServiceCollection();
+        services.AddInfrastructure(UnreachableDatabase + ";Maximum Pool Size=10");
+        using var provider = services.BuildServiceProvider();
+
+        var dataSource = provider.GetRequiredService<NpgsqlDataSource>();
+
+        Assert.Equal(10, new NpgsqlConnectionStringBuilder(dataSource.ConnectionString).MaxPoolSize);
+    }
+
+    [Fact]
     public void Registers_the_database_migrator()
     {
         var services = new ServiceCollection();
