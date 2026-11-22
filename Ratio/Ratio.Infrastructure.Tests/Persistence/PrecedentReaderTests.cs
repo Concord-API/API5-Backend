@@ -11,11 +11,11 @@ public class PrecedentReaderTests(PostgresFixture postgres) : IClassFixture<Post
     private const string Url = "https://processo.stj.jus.br/repetitivos/temas_repetitivos/pesquisa.jsp?novaConsulta=true&tipo_pesquisa=T&cod_tema_inicial=";
 
     private const string WarehouseData =
-        "INSERT INTO dw.dim_theme (theme_name, theme_key) VALUES ('Planos de saúde', 412), ('Tema sem tese', 413); " +
+        "INSERT INTO dw.dim_theme (theme_name, theme_key) VALUES ('Planos de saúde', 412), ('Tema sem tese', 413), ('Cobertura de cirurgia', 414); " +
         "INSERT INTO dw.dim_subject (subject_name, subject_code) VALUES ('Planos de Saúde', 6233), ('Reajuste contratual', 7771), ('Outro', 9999); " +
         "INSERT INTO dw.bridge_theme_subject (theme_sk, subject_sk) " +
         "SELECT t.theme_sk, s.subject_sk FROM dw.dim_theme t JOIN dw.dim_subject s " +
-        "ON (t.theme_key = 412 AND s.subject_code IN (6233, 7771)) OR (t.theme_key = 413 AND s.subject_code = 9999); " +
+        "ON (t.theme_key IN (412, 414) AND s.subject_code IN (6233, 7771)) OR (t.theme_key = 413 AND s.subject_code = 9999); " +
         "INSERT INTO dw.dim_precedent (precedent_kind, precedent_number, thesis, question, status, judged_at, judging_body, source_url, extracted_at) VALUES " +
         "('Tema', 952, 'O reajuste por faixa etária é válido.', 'Reajuste por faixa etária', 'Trânsito em Julgado', '2016-12-14', 'S2', '" + Url + "952&cod_tema_final=952', '2026-10-20T10:00:00Z'), " +
         "('Tema', 1016, 'A tese do Tema 952 vale para os planos coletivos.', NULL, 'Acórdão Publicado', '2022-03-23', 'S2', '" + Url + "1016&cod_tema_final=1016', '2026-10-20T10:00:00Z'), " +
@@ -24,7 +24,10 @@ public class PrecedentReaderTests(PostgresFixture postgres) : IClassFixture<Post
         "leading_cases = ARRAY['REsp 1568244/RJ', 'REsp 1280211/SP'] WHERE precedent_number = 952; " +
         "INSERT INTO dw.bridge_subject_precedent (subject_sk, precedent_sk) " +
         "SELECT s.subject_sk, p.precedent_sk FROM dw.dim_subject s CROSS JOIN dw.dim_precedent p " +
-        "WHERE s.subject_code IN (6233, 7771);";
+        "WHERE s.subject_code IN (6233, 7771); " +
+        "INSERT INTO dw.bridge_theme_precedent (theme_sk, precedent_sk, link_method, similarity, embedding_model) " +
+        "SELECT t.theme_sk, p.precedent_sk, 'embedding_cosine+lexical', 0.7, 'paraphrase-multilingual-MiniLM-L12-v2' " +
+        "FROM dw.dim_theme t CROSS JOIN dw.dim_precedent p WHERE t.theme_key = 412;";
 
     private NpgsqlDataSource _dataSource = null!;
     private PrecedentReader _reader = null!;
@@ -106,6 +109,15 @@ public class PrecedentReaderTests(PostgresFixture postgres) : IClassFixture<Post
         Assert.NotNull(result);
         Assert.Empty(result.Precedents);
         Assert.Null(result.Source.ExtractedAt);
+    }
+
+    [Fact]
+    public async Task Leaves_out_a_precedent_that_only_shares_a_subject_with_the_theme()
+    {
+        var result = await _reader.GetThemeAsync(414, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Precedents);
     }
 
     [Fact]

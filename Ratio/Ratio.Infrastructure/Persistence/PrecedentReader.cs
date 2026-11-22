@@ -13,15 +13,14 @@ public sealed class PrecedentReader(NpgsqlDataSource dataSource) : IPrecedentRea
     private const string ThemeSql = "SELECT theme_sk FROM dw.dim_theme WHERE theme_key = @themeKey";
 
     private const string PrecedentsSql = """
-        SELECT DISTINCT p.precedent_kind AS Kind, p.precedent_number AS Number, p.thesis AS Thesis,
+        SELECT p.precedent_kind AS Kind, p.precedent_number AS Number, p.thesis AS Thesis,
                p.question AS Question, p.status AS Status, p.judged_at AS JudgedAt,
                p.judging_body AS JudgingBody, p.source_url AS Link, p.extracted_at AS ExtractedAt,
                p.precedent_type AS Type, p.status_date AS StatusDate, p.suspends_cases AS SuspendsCases,
                p.leading_cases AS LeadingCases
-        FROM dw.bridge_theme_subject bts
-        JOIN dw.bridge_subject_precedent bsp ON bsp.subject_sk = bts.subject_sk
-        JOIN dw.dim_precedent p ON p.precedent_sk = bsp.precedent_sk
-        WHERE bts.theme_sk = @themeSk
+        FROM dw.bridge_theme_precedent btp
+        JOIN dw.dim_precedent p ON p.precedent_sk = btp.precedent_sk
+        WHERE btp.theme_sk = @themeSk
         ORDER BY p.judged_at DESC NULLS LAST, p.precedent_number DESC
         """;
 
