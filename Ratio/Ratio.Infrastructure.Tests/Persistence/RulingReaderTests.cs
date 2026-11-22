@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using Ratio.Application.Abstractions;
 using Ratio.Infrastructure.Migrations;
 using Ratio.Infrastructure.Persistence;
 
@@ -24,7 +25,11 @@ public class RulingReaderTests(PostgresFixture postgres) : IClassFixture<Postgre
             "('stj_rulings', '1', '0000001-00.2020.3.00.0000', 'STJ', 'Terceira Turma', '2024-01-05', 'Ementa anterior.', 'https://processo.stj.jus.br/1', '2026-11-01T10:00:00Z'), " +
             "('stj_rulings', '4', NULL, 'STJ', NULL, NULL, 'Ementa sem data de julgamento.', 'https://processo.stj.jus.br/4', '2026-11-01T10:00:00Z'); " +
             "INSERT INTO dw.bridge_theme_ruling (theme_sk, ruling_sk, link_method) " +
-            "SELECT t.theme_sk, r.ruling_sk, 'cnj_exact' FROM dw.dim_theme t CROSS JOIN dw.dim_ruling r WHERE t.theme_key = 412");
+            "SELECT t.theme_sk, r.ruling_sk, 'cnj_exact' FROM dw.dim_theme t CROSS JOIN dw.dim_ruling r " +
+            "WHERE t.theme_key = 412 AND r.source_id <> '1'; " +
+            "INSERT INTO dw.bridge_theme_ruling (theme_sk, ruling_sk, link_method, similarity, similarity_threshold) " +
+            "SELECT t.theme_sk, r.ruling_sk, 'embedding_cosine+lexical', 0.72, 0.55 FROM dw.dim_theme t CROSS JOIN dw.dim_ruling r " +
+            "WHERE t.theme_key = 412 AND r.source_id = '1'");
         await command.ExecuteNonQueryAsync();
     }
 
@@ -41,6 +46,19 @@ public class RulingReaderTests(PostgresFixture postgres) : IClassFixture<Postgre
         Assert.Equal("julgamento mais recente primeiro; empate pelo tribunal e identificador da fonte", result.Ordering);
         Assert.Null(result.Rulings[^1].JudgedAt);
         Assert.Equal("STJ, Espelhos de acórdãos", result.Source.Name);
+    }
+
+    [Fact]
+    public async Task Declares_how_each_ruling_is_tied_to_the_theme()
+    {
+        var result = await _reader.ListAsync(412, 20, CancellationToken.None);
+
+        var exact = result!.Rulings.Single(ruling => ruling.SourceId == "2");
+        var similar = result.Rulings.Single(ruling => ruling.SourceId == "1");
+        Assert.Equal(new RulingTie(RulingTieMethod.CaseNumber, null, null), exact.Tie);
+        Assert.Equal(RulingTieMethod.Similarity, similar.Tie.Method);
+        Assert.Equal(0.72, similar.Tie.Similarity!.Value, 2);
+        Assert.Equal(0.55, similar.Tie.Threshold!.Value, 2);
     }
 
     [Fact]
