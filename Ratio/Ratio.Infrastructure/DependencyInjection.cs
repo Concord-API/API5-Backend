@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddSingleton<IPanelAlignmentReader, PanelAlignmentReader>();
         services.AddSingleton<IThemeCasesReader, ThemeCasesReader>();
         services.AddSingleton<IPrecedentReader, PrecedentReader>();
+        services.AddSingleton<ICaseDetailReader, CaseDetailReader>();
         services.AddSingleton<IDatabaseMigrator>(provider =>
             new DatabaseMigrator(connectionString, provider.GetRequiredService<ILogger<DatabaseMigrator>>()));
         return services;
