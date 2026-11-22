@@ -26,7 +26,7 @@ public class CaseViewTests
     ];
 
     private static CaseSiteRecord Found(string court = "TJSP", CaseFields? fields = null) =>
-        new(Number, court, false, "found", fields ?? AllFields, Movements, SiteUrl, ExtractedAt);
+        new(Number, court, "Second", false, "found", fields ?? AllFields, Movements, SiteUrl, ExtractedAt);
 
     [Fact]
     public void Shows_every_published_field_and_the_movements_in_the_site_order()
@@ -36,6 +36,7 @@ public class CaseViewTests
         Assert.Equal(CaseAvailability.Available, view.Status);
         Assert.Equal(Number, view.CaseNumber);
         Assert.Equal("TJSP", view.Court);
+        Assert.Equal("Second", view.CourtLevel);
         Assert.Equal(AllFields, view.Fields);
         Assert.Equal(Movements, view.Movements);
         Assert.Empty(view.MissingFields);
@@ -78,9 +79,9 @@ public class CaseViewTests
     [InlineData("STJ", "Os dados deste processo não estão disponíveis no Ratio: a consulta processual do STJ bloqueia acesso automatizado.")]
     public void Returns_only_the_court_and_the_reason_for_a_court_without_a_source(string court, string message)
     {
-        var view = CaseView.From(new CaseSiteRecord(Number, court, false, null, null, [], null, null));
+        var view = CaseView.From(new CaseSiteRecord(Number, court, "Superior", false, null, null, [], null, null));
 
-        Assert.Equal(new CaseDetail(null, court, CaseAvailability.SourceUnavailable, message, null, [], [], null), view);
+        Assert.Equal(new CaseDetail(null, court, null, CaseAvailability.SourceUnavailable, message, null, [], [], null), view);
     }
 
     [Fact]
@@ -98,10 +99,11 @@ public class CaseViewTests
     [Fact]
     public void Says_when_the_case_was_not_collected_yet()
     {
-        var view = CaseView.From(new CaseSiteRecord(Number, "TJSP", false, null, null, [], null, null));
+        var view = CaseView.From(new CaseSiteRecord(Number, "TJSP", "First", false, null, null, [], null, null));
 
         Assert.Equal(CaseAvailability.NotLoaded, view.Status);
         Assert.Equal(Number, view.CaseNumber);
+        Assert.Equal("First", view.CourtLevel);
         Assert.Null(view.Fields);
         Assert.Null(view.Source);
         Assert.Equal("Os dados deste processo ainda não foram coletados do site do tribunal; eles entram na próxima carga.", view.Message);
@@ -109,6 +111,6 @@ public class CaseViewTests
 
     private static void AssertSealed(CaseDetail view) =>
         Assert.Equal(
-            new CaseDetail(null, null, CaseAvailability.Sealed, "Este processo está em sigilo; o Ratio não expõe nenhum dado dele.", null, [], [], null),
+            new CaseDetail(null, null, null, CaseAvailability.Sealed, "Este processo está em sigilo; o Ratio não expõe nenhum dado dele.", null, [], [], null),
             view);
 }

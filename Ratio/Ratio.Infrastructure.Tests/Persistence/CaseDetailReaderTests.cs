@@ -58,6 +58,7 @@ public class CaseDetailReaderTests(PostgresFixture postgres) : IClassFixture<Pos
         Assert.Equal(CaseAvailability.Available, detail.Status);
         Assert.Equal("1000001-23.2024.8.26.0100", detail.CaseNumber);
         Assert.Equal("TJSP", detail.Court);
+        Assert.Equal("First", detail.CourtLevel);
         Assert.NotNull(detail.Fields);
         Assert.Equal("Procedimento Comum Cível", detail.Fields.CaseClass);
         Assert.Equal(["Planos de Saúde"], detail.Fields.Subjects);

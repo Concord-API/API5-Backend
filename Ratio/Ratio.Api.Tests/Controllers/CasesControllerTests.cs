@@ -13,6 +13,7 @@ public class CasesControllerTests(ApiFactory factory) : IClassFixture<ApiFactory
     private static readonly CaseDetail Available = new(
         "1000001-23.2024.8.26.0100",
         "TJSP",
+        "First",
         CaseAvailability.Available,
         "O site do tribunal não publica estes campos para este processo.",
         new CaseFields(
@@ -42,6 +43,7 @@ public class CasesControllerTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.Equal("1000001-23.2024.8.26.0100", body.GetProperty("caseNumber").GetString());
         Assert.Equal("TJSP", body.GetProperty("court").GetString());
+        Assert.Equal("First", body.GetProperty("courtLevel").GetString());
         Assert.Equal("available", body.GetProperty("status").GetString());
         var fields = body.GetProperty("fields");
         Assert.Equal("Procedimento Comum Cível", fields.GetProperty("caseClass").GetString());
@@ -63,6 +65,7 @@ public class CasesControllerTests(ApiFactory factory) : IClassFixture<ApiFactory
             .ReturnsAsync(new CaseDetail(
                 null,
                 "TJRJ",
+                null,
                 CaseAvailability.SourceUnavailable,
                 "Os dados deste processo não estão disponíveis no Ratio: a consulta pública do TJRJ só pode ser feita com captcha.",
                 null,
