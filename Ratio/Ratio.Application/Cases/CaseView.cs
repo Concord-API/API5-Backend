@@ -25,17 +25,17 @@ public static class CaseView
     {
         if (record.Sealed || record.SiteStatus == "sealed")
         {
-            return new(null, null, CaseAvailability.Sealed, SealedMessage, null, [], [], null);
+            return new(null, null, null, CaseAvailability.Sealed, SealedMessage, null, [], [], null);
         }
 
         if (!SiteSources.TryGetValue(record.Court, out var sourceName))
         {
-            return new(null, record.Court, CaseAvailability.SourceUnavailable, SourcelessMessage(record.Court), null, [], [], null);
+            return new(null, record.Court, null, CaseAvailability.SourceUnavailable, SourcelessMessage(record.Court), null, [], [], null);
         }
 
         if (record.SiteStatus is null || record.SourceUrl is null || record.ExtractedAt is null)
         {
-            return new(record.CaseNumber, record.Court, CaseAvailability.NotLoaded, NotLoadedMessage, null, [], [], null);
+            return new(record.CaseNumber, record.Court, record.CourtLevel, CaseAvailability.NotLoaded, NotLoadedMessage, null, [], [], null);
         }
 
         var source = new CaseSource(sourceName, record.SourceUrl, record.ExtractedAt.Value);
@@ -45,6 +45,7 @@ public static class CaseView
             return new(
                 record.CaseNumber,
                 record.Court,
+                record.CourtLevel,
                 CaseAvailability.NotFoundOnSite,
                 $"A consulta pública do {record.Court} não encontrou este processo.",
                 null,
@@ -58,6 +59,7 @@ public static class CaseView
         return new(
             record.CaseNumber,
             record.Court,
+            record.CourtLevel,
             CaseAvailability.Available,
             missing.Count == 0 ? null : MissingMessage,
             record.Fields,

@@ -26,6 +26,7 @@ public sealed record CaseSource(string Name, string Url, DateTimeOffset Extracte
 public sealed record CaseDetail(
     string? CaseNumber,
     string? Court,
+    string? CourtLevel,
     CaseAvailability Status,
     string? Message,
     CaseFields? Fields,
@@ -36,6 +37,7 @@ public sealed record CaseDetail(
 public sealed record CaseSiteRecord(
     string CaseNumber,
     string Court,
+    string CourtLevel,
     bool Sealed,
     string? SiteStatus,
     CaseFields? Fields,

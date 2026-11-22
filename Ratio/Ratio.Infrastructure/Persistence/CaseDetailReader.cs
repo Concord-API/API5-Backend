@@ -9,7 +9,7 @@ public sealed class CaseDetailReader(NpgsqlDataSource dataSource) : ICaseDetailR
 {
     private const string CaseSql = """
         SELECT dc.case_sk AS CaseSk, COALESCE(dc.case_number_formatted, dc.case_number) AS CaseNumber,
-               c.court_code AS Court, dc.secrecy_level > 0 AS Sealed, d.status AS SiteStatus,
+               c.court_code AS Court, dc.court_level AS CourtLevel, dc.secrecy_level > 0 AS Sealed, d.status AS SiteStatus,
                d.case_class AS CaseClass, d.subjects AS Subjects, d.judging_body AS JudgingBody, d.judge AS Judge,
                d.filed_at AS FiledAt, d.decision_date AS DecisionDate, d.decision_result AS DecisionResult,
                d.situation AS Situation, d.source_url AS SourceUrl, d.extracted_at AS ExtractedAt
@@ -51,6 +51,7 @@ public sealed class CaseDetailReader(NpgsqlDataSource dataSource) : ICaseDetailR
         return CaseView.From(new CaseSiteRecord(
             row.CaseNumber,
             row.Court,
+            row.CourtLevel,
             sealedCase,
             row.SiteStatus,
             row.SiteStatus == "found" ? Fields(row) : null,
@@ -78,6 +79,8 @@ public sealed class CaseDetailReader(NpgsqlDataSource dataSource) : ICaseDetailR
         public string CaseNumber { get; init; } = "";
 
         public string Court { get; init; } = "";
+
+        public string CourtLevel { get; init; } = "";
 
         public bool Sealed { get; init; }
 
