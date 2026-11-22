@@ -30,7 +30,12 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
             connectionString,
             NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
 
-        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql"], appliedScripts);
+        Assert.Equal(
+            [
+                "Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V027__expand_search_query_once.sql"
+            ],
+            appliedScripts);
 
         await using var verification = new NpgsqlConnection(connectionString);
         await verification.OpenAsync();
