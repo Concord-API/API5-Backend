@@ -8,11 +8,14 @@ public sealed class RulingReader(NpgsqlDataSource dataSource) : IRulingReader
 {
     private const string SourceName = "STJ, Espelhos de acórdãos";
     private const string SourceUrl = "https://dadosabertos.web.stj.jus.br/dataset/espelhos-de-acordaos-primeira-secao";
+    private const string ExactMethod = "cnj_exact";
     private const string ThemeSql = "SELECT theme_sk FROM dw.dim_theme WHERE theme_key = @themeKey";
     private const string RulingsSql = """
         SELECT r.source_id AS SourceId, r.case_number AS CaseNumber, r.court_code AS Court,
                r.judging_body AS JudgingBody, r.judged_at AS JudgedAt, r.summary AS Summary,
-               r.source_url AS Link, r.extracted_at AS ExtractedAt
+               r.source_url AS Link, r.extracted_at AS ExtractedAt, btr.link_method AS LinkMethod,
+               round(btr.similarity::numeric, 4)::double precision AS Similarity,
+               round(btr.similarity_threshold::numeric, 4)::double precision AS SimilarityThreshold
         FROM dw.bridge_theme_ruling btr
         JOIN dw.dim_ruling r ON r.ruling_sk = btr.ruling_sk
         WHERE btr.theme_sk = @themeSk
@@ -54,7 +57,11 @@ public sealed class RulingReader(NpgsqlDataSource dataSource) : IRulingReader
         row.JudgingBody,
         row.JudgedAt is null ? null : DateOnly.FromDateTime(row.JudgedAt.Value),
         row.Summary,
-        row.Link);
+        row.Link,
+        new RulingTie(
+            row.LinkMethod == ExactMethod ? RulingTieMethod.CaseNumber : RulingTieMethod.Similarity,
+            row.Similarity,
+            row.SimilarityThreshold));
 
     private sealed record RulingRow(
         string SourceId,
@@ -64,5 +71,8 @@ public sealed class RulingReader(NpgsqlDataSource dataSource) : IRulingReader
         DateTime? JudgedAt,
         string Summary,
         string Link,
-        DateTime ExtractedAt);
+        DateTime ExtractedAt,
+        string LinkMethod,
+        double? Similarity,
+        double? SimilarityThreshold);
 }
