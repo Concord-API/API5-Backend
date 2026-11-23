@@ -30,6 +30,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public Mock<IPrecedentReader> PrecedentReader { get; } = new();
 
+    public Mock<IRulingReader> RulingReader { get; } = new();
     public Mock<ICaseDetailReader> CaseDetailReader { get; } = new();
 
     public Mock<IDatabaseMigrator> DatabaseMigrator { get; } = new();
@@ -82,6 +83,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(PanelAlignmentReader.Object);
             services.AddSingleton(ThemeCasesReader.Object);
             services.AddSingleton(PrecedentReader.Object);
+            services.AddSingleton(RulingReader.Object);
             services.AddSingleton(CaseDetailReader.Object);
             services.AddSingleton(DatabaseMigrator.Object);
             services.AddControllers().AddApplicationPart(typeof(ApiFactory).Assembly);

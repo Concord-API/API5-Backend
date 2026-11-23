@@ -61,7 +61,7 @@ public sealed class MigrationVersionTests(PostgresFixture postgres) : IClassFixt
         var journalCount = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM migrations.schema_versions");
 
-        Assert.Equal(28, journalCount);
+        Assert.Equal(29, journalCount);
     }
 
     private static IEnumerable<string> MigrationVersions() =>

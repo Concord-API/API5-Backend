@@ -26,7 +26,8 @@ public class ThemePrecedentsControllerTests(ApiFactory factory) : IClassFixture<
                 new DateOnly(2016, 12, 14),
                 "Segunda Seção",
                 "https://processo.stj.jus.br/repetitivos/temas_repetitivos/pesquisa.jsp?novaConsulta=true&tipo_pesquisa=T&cod_tema_inicial=952&cod_tema_final=952")
-        ]);
+        ],
+        1);
 
     [Fact]
     public async Task Returns_the_theses_of_the_theme_with_their_source()
@@ -40,6 +41,9 @@ public class ThemePrecedentsControllerTests(ApiFactory factory) : IClassFixture<
         Assert.Equal(412, body.GetProperty("themeKey").GetInt64());
         Assert.Equal("STJ, Precedentes qualificados", body.GetProperty("source").GetProperty("name").GetString());
         Assert.Equal("2026-10-20T10:00:00+00:00", body.GetProperty("source").GetProperty("extractedAt").GetString());
+        Assert.Equal(1, body.GetProperty("shown").GetInt32());
+        Assert.Equal(1, body.GetProperty("total").GetInt32());
+        Assert.Equal("1 de 1 decisão", body.GetProperty("sampleLabel").GetString());
         var thesis = Assert.Single(body.GetProperty("precedents").EnumerateArray());
         Assert.Equal("Tema", thesis.GetProperty("kind").GetString());
         Assert.Equal(952, thesis.GetProperty("number").GetInt32());
