@@ -57,4 +57,34 @@ public class MetricsExportTests
 
         Assert.Contains(exported, metric => metric.Name == metricName);
     }
+
+    [Fact]
+    public async Task Measures_request_durations_up_to_60_seconds()
+    {
+        var exported = new List<Metric>();
+        using var factory = new ApiFactory();
+        using var configured = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("OpenTelemetry:Endpoint", "http://127.0.0.1:4317")
+            .ConfigureTestServices(services =>
+                services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(exported))));
+
+        await configured.CreateClient().GetAsync("/health");
+        configured.Services.GetRequiredService<MeterProvider>().ForceFlush();
+
+        var duration = exported.First(metric => metric.Name == "http.server.request.duration");
+        var bounds = new List<double>();
+        foreach (var point in duration.GetMetricPoints())
+        {
+            foreach (var bucket in point.GetHistogramBuckets())
+            {
+                bounds.Add(bucket.ExplicitBound);
+            }
+
+            break;
+        }
+
+        Assert.Equal(
+            [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10, 15, 30, 60, double.PositiveInfinity],
+            bounds);
+    }
 }
