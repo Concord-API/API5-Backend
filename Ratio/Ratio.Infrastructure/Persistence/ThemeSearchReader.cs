@@ -13,18 +13,55 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
 
     private const int MaxVisibleCourts = 3;
 
-    private static readonly string SearchSql = Sql($"dw.search_themes(@query, @limit, {FilterArguments})");
+    private const string AppealPolarityLabel = "acolhimento da pretensão de quem recorreu";
 
-    private static readonly string TopSql = Sql($"dw.top_themes(@limit, {FilterArguments})");
+    private static readonly string[] SuperiorCourts = ["STF", "STJ"];
 
-    private static string Sql(string source) => $"""
+    private static readonly string SearchSql = Sql($"dw.search_themes(@query, @limit, {FilterArguments})", scoped: false);
+
+    private static readonly string ScopedSearchSql = Sql($"dw.search_themes(@query, @limit, {FilterArguments})", scoped: true);
+
+    private static readonly string TopSql = Sql($"dw.top_themes(@limit, {FilterArguments})", scoped: false);
+
+    private static readonly string ScopedTopSql = Sql($"dw.top_themes(@limit, {FilterArguments})", scoped: true);
+
+    private const string UnscopedColumns = """
+        NULL::bigint AS ScopedClaimUpheld, NULL::bigint AS ScopedClaimRejected,
+               NULL::bigint AS ScopedAppealUpheld, NULL::bigint AS ScopedAppealRejected,
+               NULL::text[] AS ScopedCourtCodes, NULL::date AS ScopedLastDecisionDate
+        """;
+
+    private const string ScopedColumns = """
+        scoped.claim_upheld AS ScopedClaimUpheld, scoped.claim_rejected AS ScopedClaimRejected,
+               scoped.appeal_upheld AS ScopedAppealUpheld, scoped.appeal_rejected AS ScopedAppealRejected,
+               scoped.codes AS ScopedCourtCodes, scoped.last_decision_date AS ScopedLastDecisionDate
+        """;
+
+    private const string ScopedJoin = """
+        LEFT JOIN LATERAL (
+            SELECT coalesce(sum(tbc.claim_upheld_count), 0)::bigint AS claim_upheld,
+                   coalesce(sum(tbc.claim_rejected_count), 0)::bigint AS claim_rejected,
+                   coalesce(sum(tbc.appeal_upheld_count), 0)::bigint AS appeal_upheld,
+                   coalesce(sum(tbc.appeal_rejected_count), 0)::bigint AS appeal_rejected,
+                   array_agg(tbc.court_code ORDER BY tbc.court_code) FILTER (
+                       WHERE tbc.claim_upheld_count + tbc.claim_rejected_count
+                           + tbc.appeal_upheld_count + tbc.appeal_rejected_count > 0) AS codes,
+                   (SELECT max(a.last_decision_date) FROM dw.theme_court_activity a
+                    WHERE a.theme_sk = t.theme_sk AND a.court_code = ANY(@scopeCourts::text[])) AS last_decision_date
+            FROM dw.theme_by_court tbc
+            WHERE tbc.theme_sk = t.theme_sk AND tbc.court_code = ANY(@scopeCourts::text[])
+        ) scoped ON true
+        """;
+
+    private static string Sql(string source, bool scoped) => $"""
         SELECT s.theme_key AS ThemeKey, s.theme_name AS Name, s.subject_area AS SubjectArea,
                ts.judged AS Judged, ts.upheld AS Upheld, ts.rejected AS Rejected,
                ts.claim_polarity_label AS PolarityLabel, ts.last_decision_date AS LastDecisionDate,
                ts.score AS StrengthScore, ts.level AS Level, cfg.min_judged_for_percentage AS MinJudgedForPercentage,
                cfg.min_judged_for_grade AS MinJudgedForGrade,
                sm.period_start_year AS PeriodStartYear, sm.period_end_year AS PeriodEndYear,
-               ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes, n.lead::text AS Lead
+               ts.agreement_basis AS AgreementBasis, courts.codes AS CourtCodes, n.lead::text AS Lead,
+               {(scoped ? ScopedColumns : UnscopedColumns)}
         FROM {source} s
         JOIN dw.dim_theme t ON t.theme_key = s.theme_key
         LEFT JOIN dw.theme_strength ts ON ts.theme_sk = t.theme_sk
@@ -39,16 +76,38 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
             JOIN dw.dim_court c ON c.court_sk = ccr.court_sk
             WHERE bts.theme_sk = t.theme_sk
         ) courts ON true
+        {(scoped ? ScopedJoin : "")}
         ORDER BY s.position
         """;
 
     public Task<IReadOnlyList<ThemeSummary>> SearchThemesAsync(
         string? query, int limit, ThemeFilters filters, CancellationToken cancellationToken) =>
-        QueryAsync(SearchSql, Parameters(new { query, limit }, filters), cancellationToken);
+        QueryAsync(
+            ScopeCourts(filters) is null ? SearchSql : ScopedSearchSql,
+            Parameters(new { query, limit }, filters),
+            ScopeCourts(filters),
+            cancellationToken);
 
     public Task<IReadOnlyList<ThemeSummary>> TopThemesAsync(
         int limit, ThemeFilters filters, CancellationToken cancellationToken) =>
-        QueryAsync(TopSql, Parameters(new { limit }, filters), cancellationToken);
+        QueryAsync(
+            ScopeCourts(filters) is null ? TopSql : ScopedTopSql,
+            Parameters(new { limit }, filters),
+            ScopeCourts(filters),
+            cancellationToken);
+
+    private static string[]? ScopeCourts(ThemeFilters filters)
+    {
+        var superior = filters.Levels is { Count: > 0 } levels && levels.All(level => level == "Superior");
+        IEnumerable<string>? scope = filters.Courts is { Count: > 0 } courts ? courts : null;
+
+        if (superior)
+        {
+            scope = scope is null ? SuperiorCourts : scope.Intersect(SuperiorCourts);
+        }
+
+        return scope?.Distinct().Order(StringComparer.Ordinal).ToArray();
+    }
 
     private static DynamicParameters Parameters(object template, ThemeFilters filters)
     {
@@ -57,11 +116,12 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         parameters.Add("periodYears", filters.PeriodYears);
         parameters.Add("levels", filters.Levels?.ToArray());
         parameters.Add("minStrength", filters.MinStrength);
+        parameters.Add("scopeCourts", ScopeCourts(filters));
         return parameters;
     }
 
     private async Task<IReadOnlyList<ThemeSummary>> QueryAsync(
-        string sql, object parameters, CancellationToken cancellationToken)
+        string sql, object parameters, string[]? scopeCourts, CancellationToken cancellationToken)
     {
         try
         {
@@ -69,7 +129,7 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
             var rows = await connection.QueryAsync<ThemeSearchRow>(
                 new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
 
-            return rows.Select(Map).ToArray();
+            return rows.Select(row => scopeCourts is null ? Map(row) : MapScoped(row, scopeCourts)).ToArray();
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
         {
@@ -105,6 +165,35 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         };
     }
 
+    private static ThemeSummary MapScoped(ThemeSearchRow row, string[] scopeCourts)
+    {
+        var claims = (row.ScopedClaimUpheld ?? 0) + (row.ScopedClaimRejected ?? 0);
+        var appeals = (row.ScopedAppealUpheld ?? 0) + (row.ScopedAppealRejected ?? 0);
+        var onClaims = claims > 0;
+        var upheld = onClaims ? row.ScopedClaimUpheld ?? 0 : appeals > 0 ? row.ScopedAppealUpheld ?? 0 : 0;
+        var rejected = onClaims ? row.ScopedClaimRejected ?? 0 : appeals > 0 ? row.ScopedAppealRejected ?? 0 : 0;
+        var judged = upheld + rejected;
+        var label = onClaims ? row.PolarityLabel : appeals > 0 ? AppealPolarityLabel : null;
+        var meetsFloor = row.MinJudgedForPercentage is not null && judged >= row.MinJudgedForPercentage;
+        var upheldRatio = onClaims && meetsFloor ? Math.Round((decimal)upheld / judged, 4) : (decimal?)null;
+        var themeJudged = row.Judged ?? 0;
+        var level = row.MinJudgedForGrade is not null && themeJudged >= row.MinJudgedForGrade ? row.Level : null;
+        var lastDecisionDate = row.ScopedLastDecisionDate is null
+            ? (DateOnly?)null
+            : DateOnly.FromDateTime(row.ScopedLastDecisionDate.Value);
+        var courts = row.ScopedCourtCodes?.Cast<string>().ToArray() ?? [];
+
+        return new ThemeSummary(
+            row.ThemeKey, row.Name, row.SubjectArea, judged, row.StrengthScore, level,
+            new ThemeOutcome(upheld, rejected, upheldRatio, label),
+            row.PeriodStartYear, row.PeriodEndYear, lastDecisionDate)
+        {
+            Courts = courts.Take(MaxVisibleCourts).ToArray(),
+            AdditionalCourtCount = Math.Max(0, courts.Length - MaxVisibleCourts),
+            NumbersCourts = scopeCourts
+        };
+    }
+
     private sealed record ThemeSearchRow(
         long ThemeKey,
         string Name,
@@ -122,5 +211,11 @@ public sealed class ThemeSearchReader(NpgsqlDataSource dataSource, ILogger<Theme
         short? PeriodEndYear,
         string? AgreementBasis,
         Array? CourtCodes,
-        string? Lead);
+        string? Lead,
+        long? ScopedClaimUpheld,
+        long? ScopedClaimRejected,
+        long? ScopedAppealUpheld,
+        long? ScopedAppealRejected,
+        Array? ScopedCourtCodes,
+        DateTime? ScopedLastDecisionDate);
 }

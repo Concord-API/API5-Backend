@@ -18,6 +18,8 @@ public sealed record ThemeSummary(
 
     public int AdditionalCourtCount { get; init; }
 
+    public IReadOnlyList<string>? NumbersCourts { get; init; }
+
     public ThemeResultSummary? Summary { get; init; }
 }
 
