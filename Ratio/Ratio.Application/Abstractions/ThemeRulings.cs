@@ -9,7 +9,16 @@ public sealed record CourtRuling(
     string? JudgingBody,
     DateOnly? JudgedAt,
     string Summary,
-    string Link);
+    string Link,
+    RulingTie Tie);
+
+public enum RulingTieMethod
+{
+    CaseNumber,
+    Similarity
+}
+
+public sealed record RulingTie(RulingTieMethod Method, double? Similarity, double? Threshold);
 
 public sealed record RulingSource(string Name, string Url, DateTimeOffset? ExtractedAt);
 

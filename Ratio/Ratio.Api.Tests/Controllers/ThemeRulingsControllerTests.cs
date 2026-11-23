@@ -17,7 +17,7 @@ public class ThemeRulingsControllerTests(ApiFactory factory) : IClassFixture<Api
             new ThemeRulings(
                 412,
                 new RulingSource("STJ, Espelhos de acórdãos", "https://dadosabertos.web.stj.jus.br/dataset/espelhos-de-acordaos-primeira-secao", new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero)),
-                [new CourtRuling("2", "0000002-00.2020.3.00.0000", "STJ", "Segunda Seção", new DateOnly(2025, 2, 10), "Ementa publicada.", "https://processo.stj.jus.br/2")],
+                [new CourtRuling("2", "0000002-00.2020.3.00.0000", "STJ", "Segunda Seção", new DateOnly(2025, 2, 10), "Ementa publicada.", "https://processo.stj.jus.br/2", new RulingTie(RulingTieMethod.Similarity, 0.72, 0.55))],
                 1));
 
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/412/rulings");
@@ -25,6 +25,10 @@ public class ThemeRulingsControllerTests(ApiFactory factory) : IClassFixture<Api
         Assert.Equal("Ementa publicada.", body.GetProperty("rulings")[0].GetProperty("summary").GetString());
         Assert.False(body.GetProperty("rulings")[0].TryGetProperty("thesis", out _));
         Assert.Equal("1 de 1 decisão", body.GetProperty("sampleLabel").GetString());
+        var tie = body.GetProperty("rulings")[0].GetProperty("tie");
+        Assert.Equal("similarity", tie.GetProperty("method").GetString());
+        Assert.Equal(0.72, tie.GetProperty("similarity").GetDouble(), 2);
+        Assert.Equal(0.55, tie.GetProperty("threshold").GetDouble(), 2);
     }
 
     [Fact]
