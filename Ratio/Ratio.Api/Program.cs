@@ -76,6 +76,7 @@ builder.Services.AddHostedService<DatabaseMigrationService>();
 builder.Services.AddRatioObservability(otlpEndpoint);
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context => ProblemDetailsTitles.Localize(context.ProblemDetails));
+builder.Services.AddExceptionHandler<DatabaseUnavailableHandler>();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
 builder.Services.AddCors(options =>
