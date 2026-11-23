@@ -156,6 +156,19 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
     }
 
     [Fact]
+    public async Task Keeps_only_the_themes_with_every_term_when_some_have_them()
+    {
+        await InsertThemesAsync(["Planos de saúde", "Plano de Classificação de Cargos"]);
+        await InsertJudgedCasesAsync("Planos de saúde", upheldCount: 3, rejectedCount: 2);
+        await InsertJudgedCasesAsync("Plano de Classificação de Cargos", upheldCount: 10, rejectedCount: 0);
+        await RefreshAggregatesAsync();
+
+        var results = await SearchAsync("plano de saúde");
+
+        Assert.Equal(["Planos de saúde"], results.Select(result => result.ThemeName));
+    }
+
+    [Fact]
     public async Task Returns_nothing_for_an_out_of_scope_query()
     {
         Assert.Empty(await SearchAsync("contrato de arrendamento de satélite"));
