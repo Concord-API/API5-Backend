@@ -16,7 +16,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
     {
         var connectionString = await postgres.CreateDatabaseAsync();
 
-        await ApplyMigrationsThroughAsync(connectionString, 28);
+        await ApplyMigrationsThroughAsync(connectionString, 27);
 
         await using (var connection = new NpgsqlConnection(connectionString))
         {
@@ -33,7 +33,13 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
             connectionString,
             NullLogger<DatabaseMigrator>.Instance).MigrateAsync(CancellationToken.None);
 
-        Assert.Equal(["Ratio.Infrastructure.Migrations.Scripts.V029__theme_precedent_link.sql"], appliedScripts);
+        Assert.Equal(
+            [
+                "Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V029__theme_precedent_link.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V030__keep_themes_with_every_search_term.sql"
+            ],
+            appliedScripts);
 
         await using var verification = new NpgsqlConnection(connectionString);
         await verification.OpenAsync();
@@ -41,16 +47,16 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         var preservedRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_theme WHERE theme_key = 900001");
         var journalRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V029__theme_precedent_link.sql'");
+            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname IN ('Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql', 'Ratio.Infrastructure.Migrations.Scripts.V029__theme_precedent_link.sql')");
         var precedentRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_precedent WHERE precedent_kind = 'Tema' AND precedent_number = 952");
-        var linkTableRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name = 'bridge_theme_precedent'");
+        var tableRows = await verification.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('case_site_detail', 'case_site_movement', 'bridge_theme_precedent')");
 
         Assert.Equal(1, preservedRows);
-        Assert.Equal(1, journalRows);
+        Assert.Equal(2, journalRows);
         Assert.Equal(1, precedentRows);
-        Assert.Equal(1, linkTableRows);
+        Assert.Equal(3, tableRows);
     }
 
     private static async Task ApplyMigrationsThroughAsync(string connectionString, int version)

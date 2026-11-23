@@ -59,6 +59,8 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.case_current_result");
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_summary");
         await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_strength");
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_by_court");
+        await ExecuteAsync("REFRESH MATERIALIZED VIEW dw.theme_court_activity");
     }
 
     private async Task<TopTheme[]> TopThemesAsync(int limit)
@@ -327,6 +329,100 @@ public class ThemeSearchReaderTests : IClassFixture<PostgresFixture>, IAsyncLife
         Assert.Equal(1, theme.Outcome.Rejected);
         Assert.Null(theme.Outcome.UpheldRatio);
         Assert.Equal("acolhimento da pretensão de quem recorreu", theme.Outcome.PolarityLabel);
+    }
+
+    private async Task InsertSuperiorAppealsAsync(long themeKey, int upheldCount, int rejectedCount)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        var subjectCode = themeKey * 100;
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.dim_court (court_code, court_name, state_uf) VALUES ('STJ', 'Superior Tribunal de Justiça', 'DF') " +
+            "ON CONFLICT DO NOTHING");
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.dim_case (case_number, court_sk, court_level, source, extracted_at) " +
+            "SELECT 'STJ-' || @themeKey || '-' || lpad(n::text, 6, '0'), c.court_sk, 'Superior', 'datajud', now() " +
+            "FROM generate_series(1, @caseCount) n CROSS JOIN dw.dim_court c WHERE c.court_code = 'STJ'",
+            new { themeKey, caseCount = upheldCount + rejectedCount });
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.bridge_case_subject (case_sk, subject_sk) " +
+            "SELECT dc.case_sk, s.subject_sk FROM dw.dim_case dc CROSS JOIN dw.dim_subject s " +
+            "WHERE dc.case_number LIKE 'STJ-' || @themeKey || '-%' AND s.subject_code = @subjectCode",
+            new { themeKey, subjectCode });
+        await connection.ExecuteAsync(
+            "INSERT INTO dw.fact_case_event (case_sk, court_sk, movement_sk, date_sk, occurred_at, source_url, extracted_at, natural_key) " +
+            "SELECT dc.case_sk, dc.court_sk, m.movement_sk, 20240615, TIMESTAMPTZ '2024-06-15', 'https://example.org', now(), 'evt:' || dc.case_sk " +
+            "FROM dw.dim_case dc JOIN dw.dim_movement m " +
+            "ON m.movement_code = CASE WHEN right(dc.case_number, 6)::int <= @upheldCount THEN 237 ELSE 239 END " +
+            "WHERE dc.case_number LIKE 'STJ-' || @themeKey || '-%'",
+            new { themeKey, upheldCount });
+    }
+
+    private async Task SeedClaimsInTjspAndAppealsInStjAsync()
+    {
+        await InsertThemeAsync(40, "Contribuição sobre a folha de salários");
+        await InsertJudgedCasesAsync(40, upheldCount: 8, rejectedCount: 2, dateSk: 20240615);
+        await InsertNarrativeAsync(40);
+        await RefreshAggregatesAsync();
+        await InsertSuperiorAppealsAsync(40, upheldCount: 1, rejectedCount: 3);
+        await RefreshAggregatesAsync();
+    }
+
+    [Fact]
+    public async Task Keeps_the_whole_theme_numbers_without_a_court_filter()
+    {
+        await SeedClaimsInTjspAndAppealsInStjAsync();
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("contribuicao folha", 20, ThemeFilters.None, CancellationToken.None));
+
+        Assert.Equal(10, theme.JudgedCount);
+        Assert.Equal(0.8m, theme.Outcome.UpheldRatio);
+        Assert.Equal(["STJ", "TJSP"], theme.Courts);
+        Assert.Null(theme.NumbersCourts);
+        Assert.NotNull(theme.Summary);
+    }
+
+    [Fact]
+    public async Task Shows_only_the_numbers_of_the_filtered_court()
+    {
+        await SeedClaimsInTjspAndAppealsInStjAsync();
+        var filters = new ThemeFilters(["STJ"], null, null, null);
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("contribuicao folha", 20, filters, CancellationToken.None));
+
+        Assert.Equal(4, theme.JudgedCount);
+        Assert.Equal(1, theme.Outcome.Upheld);
+        Assert.Equal(3, theme.Outcome.Rejected);
+        Assert.Null(theme.Outcome.UpheldRatio);
+        Assert.Equal("acolhimento da pretensão de quem recorreu", theme.Outcome.PolarityLabel);
+        Assert.Equal(["STJ"], theme.Courts);
+        Assert.Equal(["STJ"], theme.NumbersCourts);
+        Assert.Null(theme.Summary);
+    }
+
+    [Fact]
+    public async Task Shows_only_the_superior_courts_numbers_for_the_superior_level()
+    {
+        await SeedClaimsInTjspAndAppealsInStjAsync();
+        var filters = new ThemeFilters(null, null, ["Superior"], null);
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("contribuicao folha", 20, filters, CancellationToken.None));
+
+        Assert.Equal(4, theme.JudgedCount);
+        Assert.Equal(["STJ"], theme.Courts);
+        Assert.Equal(["STF", "STJ"], theme.NumbersCourts);
+    }
+
+    [Fact]
+    public async Task Shows_the_percentage_of_a_filtered_state_court()
+    {
+        await SeedClaimsInTjspAndAppealsInStjAsync();
+        var filters = new ThemeFilters(["TJSP"], null, null, null);
+
+        var theme = Assert.Single(await _reader.SearchThemesAsync("contribuicao folha", 20, filters, CancellationToken.None));
+
+        Assert.Equal(10, theme.JudgedCount);
+        Assert.Equal(0.8m, theme.Outcome.UpheldRatio);
+        Assert.Equal(["TJSP"], theme.Courts);
     }
 
     [Fact]

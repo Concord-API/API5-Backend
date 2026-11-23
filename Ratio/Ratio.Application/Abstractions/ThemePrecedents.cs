@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Ratio.Application.Abstractions;
 
 public sealed record ThemePrecedent(
@@ -21,7 +23,19 @@ public sealed record ThemePrecedent(
 
 public sealed record PrecedentSource(string Name, string Url, DateTimeOffset? ExtractedAt);
 
-public sealed record ThemePrecedents(long ThemeKey, PrecedentSource Source, IReadOnlyList<ThemePrecedent> Precedents);
+public sealed record ThemePrecedents(
+    long ThemeKey,
+    PrecedentSource Source,
+    IReadOnlyList<ThemePrecedent> Precedents,
+    long Total)
+{
+    private static readonly CultureInfo Portuguese = CultureInfo.GetCultureInfo("pt-BR");
+
+    public int Shown => Precedents.Count;
+
+    public string SampleLabel =>
+        string.Format(Portuguese, "{0:N0} de {1:N0} {2}", Shown, Total, Total == 1 ? "decisão" : "decisões");
+}
 
 public interface IPrecedentReader
 {
