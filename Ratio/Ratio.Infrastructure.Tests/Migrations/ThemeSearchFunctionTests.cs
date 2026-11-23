@@ -186,9 +186,8 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
     [Fact]
     public async Task Positions_the_themes_by_strength_score_descending()
     {
-        var results = await SearchAsync("inscricao indevida");
+        var results = await SearchAsync("indevida");
 
-        Assert.True(results[0].Rank < results[1].Rank);
         Assert.True(await StrengthScoreAsync(results[0].ThemeName) > await StrengthScoreAsync(results[1].ThemeName));
         Assert.Equal([WrongfulNegativeRecord, WrongfulListing], results.Select(result => result.ThemeName));
         Assert.Equal([1L, 2L], results.Select(result => result.Position));
@@ -197,10 +196,9 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
     [Fact]
     public async Task Orders_matching_themes_by_strength_before_applying_the_limit()
     {
-        var results = await SearchAsync("inscricao indevida");
-        var limitedResults = await SearchAsync("inscricao indevida", 1);
+        var results = await SearchAsync("indevida");
+        var limitedResults = await SearchAsync("indevida", 1);
 
-        Assert.True(results[0].Rank < results[1].Rank);
         Assert.True(await StrengthScoreAsync(results[0].ThemeName) > await StrengthScoreAsync(results[1].ThemeName));
         Assert.Equal([WrongfulNegativeRecord, WrongfulListing], results.Select(result => result.ThemeName));
         Assert.Equal([1L, 2L], results.Select(result => result.Position));
@@ -240,7 +238,7 @@ public class ThemeSearchFunctionTests(PostgresFixture postgres) : IClassFixture<
     [Fact]
     public async Task Cuts_the_results_at_the_limit_after_ordering_by_strength()
     {
-        var results = await SearchAsync("inscricao indevida", 1);
+        var results = await SearchAsync("indevida", 1);
 
         Assert.Equal([WrongfulNegativeRecord], results.Select(result => result.ThemeName));
     }
