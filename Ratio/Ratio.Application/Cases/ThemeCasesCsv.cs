@@ -1,0 +1,101 @@
+using System.Globalization;
+using System.Text;
+using Ratio.Application.Abstractions;
+
+namespace Ratio.Application.Cases;
+
+public static class ThemeCasesCsv
+{
+    public const int Ceiling = 10_000;
+
+    private const string LineBreak = "\r\n";
+
+    private static readonly CultureInfo Portuguese = CultureInfo.GetCultureInfo("pt-BR");
+
+    private static readonly string[] Header =
+    [
+        "Processo", "Tribunal", "Órgão julgador", "Relator", "Classe", "Grau", "Data do julgamento",
+        "Resultado", "Valor fixado", "Fonte", "Link", "Tipo do link", "Sigilo"
+    ];
+
+    private const char Separator = ';';
+
+    private static readonly char[] CharactersToQuote = [Separator, '"', '\r', '\n'];
+
+    public static string Write(ExportHeader header, IReadOnlyList<SampleCase> cases)
+    {
+        var csv = new StringBuilder();
+
+        foreach (var line in HeaderLines(header, cases.Count))
+        {
+            AppendLine(csv, line);
+        }
+
+        csv.Append(LineBreak);
+        AppendLine(csv, Header);
+
+        foreach (var sampleCase in cases.Take(Ceiling))
+        {
+            AppendLine(csv, Cells(sampleCase));
+        }
+
+        return csv.ToString();
+    }
+
+    private static IEnumerable<string?[]> HeaderLines(ExportHeader header, int total)
+    {
+        if (header.Sources.Count == 0)
+        {
+            yield return ["Fonte", null];
+            yield return ["Data de extração", null];
+        }
+
+        foreach (var source in header.Sources)
+        {
+            yield return ["Fonte", source.Name, source.SourceUrl];
+            yield return ["Data de extração", BrazilianDate(DateOnly.FromDateTime(source.ExtractedAt.UtcDateTime))];
+        }
+
+        yield return ["Escopo", ScopeText(header.Scope)];
+
+        if (total > Ceiling)
+        {
+            yield return ["Teto da exportação", string.Format(Portuguese, "{0:N0} de {1:N0} decisões", Ceiling, total)];
+        }
+    }
+
+    private static string ScopeText(Scope scope) =>
+        scope.Statement is null ? scope.Subject : $"{scope.Subject} · {scope.Statement}";
+
+    private static string BrazilianDate(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+    private static string?[] Cells(SampleCase sampleCase) =>
+    [
+        sampleCase.CaseNumber,
+        sampleCase.CourtCode,
+        sampleCase.JudgingBody,
+        null,
+        sampleCase.CaseClass,
+        sampleCase.CourtLevel,
+        sampleCase.DecisionDate is { } date ? BrazilianDate(date) : null,
+        sampleCase.Outcome,
+        null,
+        sampleCase.Source,
+        sampleCase.SourceLink,
+        sampleCase.SourceLinkType,
+        sampleCase.Sealed ? "sim" : "não"
+    ];
+
+    private static void AppendLine(StringBuilder csv, IEnumerable<string?> cells) =>
+        csv.Append(string.Join(Separator, cells.Select(Escape))).Append(LineBreak);
+
+    private static string Escape(string? cell)
+    {
+        if (cell is null)
+        {
+            return "";
+        }
+
+        return cell.IndexOfAny(CharactersToQuote) >= 0 ? $"\"{cell.Replace("\"", "\"\"")}\"" : cell;
+    }
+}

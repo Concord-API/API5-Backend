@@ -102,6 +102,16 @@ public class PrecedentReaderTests(PostgresFixture postgres) : IClassFixture<Post
     }
 
     [Fact]
+    public async Task Reports_the_total_and_sample_label_for_the_theme()
+    {
+        var result = await _reader.GetThemeAsync(412, CancellationToken.None);
+
+        Assert.Equal(3, result!.Total);
+        Assert.Equal(3, result.Shown);
+        Assert.Equal("3 de 3 decisões", result.SampleLabel);
+    }
+
+    [Fact]
     public async Task Returns_an_empty_list_for_a_theme_without_a_thesis()
     {
         var result = await _reader.GetThemeAsync(413, CancellationToken.None);

@@ -170,4 +170,22 @@ public class QueryExpansionTests(PostgresFixture postgres) : IClassFixture<Postg
     {
         Assert.Equal("", await ExpandAsync(null));
     }
+
+    [Fact]
+    public async Task Reads_the_synonyms_once_per_search()
+    {
+        await InsertThemesAsync();
+        await InsertSynonymsAsync();
+
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await connection.QueryAsync<string>(
+            "SELECT theme_name FROM dw.search_themes(@query)", new { query = JargonPhrase }, transaction);
+        var reads = await connection.ExecuteScalarAsync<long>(
+            "SELECT coalesce(seq_scan, 0) + coalesce(idx_scan, 0) FROM pg_stat_xact_user_tables " +
+            "WHERE schemaname = 'dw' AND relname = 'search_synonym'",
+            transaction: transaction);
+
+        Assert.Equal(1, reads);
+    }
 }

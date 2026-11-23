@@ -17,6 +17,9 @@ public static class ObservabilityExtensions
         WarehouseMetrics.MeterName
     ];
 
+    private static readonly double[] RequestDurationBounds =
+        [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10, 15, 30, 60];
+
     public static Uri? ReadOtlpEndpoint(this IConfiguration configuration)
     {
         var value = configuration["OpenTelemetry:Endpoint"];
@@ -45,6 +48,9 @@ public static class ObservabilityExtensions
             .ConfigureResource(resource => resource.AddService(ServiceName))
             .WithMetrics(metrics => metrics
                 .AddMeter(Meters)
+                .AddView(
+                    "http.server.request.duration",
+                    new ExplicitBucketHistogramConfiguration { Boundaries = RequestDurationBounds })
                 .AddOtlpExporter(options => options.Endpoint = otlpEndpoint))
             .WithTracing(tracing => tracing
                 .SetSampler(new ParentBasedSampler(new RequestRootSampler()))

@@ -26,6 +26,30 @@ public class DependencyInjectionTests
     }
 
     [Fact]
+    public void Caps_the_connection_pool_at_40_when_the_connection_string_does_not_set_it()
+    {
+        var services = new ServiceCollection();
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        var dataSource = provider.GetRequiredService<NpgsqlDataSource>();
+
+        Assert.Equal(40, new NpgsqlConnectionStringBuilder(dataSource.ConnectionString).MaxPoolSize);
+    }
+
+    [Fact]
+    public void Keeps_the_pool_size_set_in_the_connection_string()
+    {
+        var services = new ServiceCollection();
+        services.AddInfrastructure(UnreachableDatabase + ";Maximum Pool Size=10");
+        using var provider = services.BuildServiceProvider();
+
+        var dataSource = provider.GetRequiredService<NpgsqlDataSource>();
+
+        Assert.Equal(10, new NpgsqlConnectionStringBuilder(dataSource.ConnectionString).MaxPoolSize);
+    }
+
+    [Fact]
     public void Registers_the_database_migrator()
     {
         var services = new ServiceCollection();
@@ -89,5 +113,27 @@ public class DependencyInjectionTests
         using var provider = services.BuildServiceProvider();
 
         Assert.IsType<ThemeCasesReader>(provider.GetRequiredService<IThemeCasesReader>());
+    }
+
+    [Fact]
+    public void Serves_the_court_levels_from_the_load_cache()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<CachedCourtLevelReader>(provider.GetRequiredService<ICourtLevelReader>());
+    }
+
+    [Fact]
+    public void Serves_the_court_case_counts_from_the_load_cache()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddInfrastructure(UnreachableDatabase);
+        using var provider = services.BuildServiceProvider();
+
+        Assert.IsType<CachedCourtCaseCountReader>(provider.GetRequiredService<ICourtCaseCountReader>());
     }
 }
