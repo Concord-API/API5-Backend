@@ -24,6 +24,9 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
             await connection.ExecuteAsync(
                 "INSERT INTO dw.dim_theme (theme_name, subject_area, theme_key) VALUES (@Name, @Area, @Key)",
                 new { Name = "Existing theme", Area = "CIVIL", Key = 900001L });
+            await connection.ExecuteAsync(
+                "INSERT INTO dw.dim_precedent (precedent_kind, precedent_number, thesis, status, source_url, extracted_at) " +
+                "VALUES ('Tema', 952, 'O reajuste por faixa etária é válido.', 'Trânsito em Julgado', 'https://stj.jus.br', now())");
         }
 
         var appliedScripts = await new DatabaseMigrator(
@@ -33,6 +36,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         Assert.Equal(
             [
                 "Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V029__theme_precedent_link.sql",
                 "Ratio.Infrastructure.Migrations.Scripts.V030__keep_themes_with_every_search_term.sql"
             ],
             appliedScripts);
@@ -43,13 +47,16 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         var preservedRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_theme WHERE theme_key = 900001");
         var journalRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql'");
+            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname IN ('Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql', 'Ratio.Infrastructure.Migrations.Scripts.V029__theme_precedent_link.sql')");
+        var precedentRows = await verification.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM dw.dim_precedent WHERE precedent_kind = 'Tema' AND precedent_number = 952");
         var tableRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('case_site_detail', 'case_site_movement')");
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('case_site_detail', 'case_site_movement', 'bridge_theme_precedent')");
 
         Assert.Equal(1, preservedRows);
-        Assert.Equal(1, journalRows);
-        Assert.Equal(2, tableRows);
+        Assert.Equal(2, journalRows);
+        Assert.Equal(1, precedentRows);
+        Assert.Equal(3, tableRows);
     }
 
     private static async Task ApplyMigrationsThroughAsync(string connectionString, int version)

@@ -13,13 +13,14 @@ public sealed class PrecedentReader(NpgsqlDataSource dataSource) : IPrecedentRea
     private const string ThemeSql = "SELECT theme_sk FROM dw.dim_theme WHERE theme_key = @themeKey";
 
     private const string PrecedentsSql = """
-        SELECT DISTINCT p.precedent_kind AS Kind, p.precedent_number AS Number, p.thesis AS Thesis,
+        SELECT p.precedent_kind AS Kind, p.precedent_number AS Number, p.thesis AS Thesis,
                p.question AS Question, p.status AS Status, p.judged_at AS JudgedAt,
-               p.judging_body AS JudgingBody, p.source_url AS Link, p.extracted_at AS ExtractedAt
-        FROM dw.bridge_theme_subject bts
-        JOIN dw.bridge_subject_precedent bsp ON bsp.subject_sk = bts.subject_sk
-        JOIN dw.dim_precedent p ON p.precedent_sk = bsp.precedent_sk
-        WHERE bts.theme_sk = @themeSk
+               p.judging_body AS JudgingBody, p.source_url AS Link, p.extracted_at AS ExtractedAt,
+               p.precedent_type AS Type, p.status_date AS StatusDate, p.suspends_cases AS SuspendsCases,
+               p.leading_cases AS LeadingCases
+        FROM dw.bridge_theme_precedent btp
+        JOIN dw.dim_precedent p ON p.precedent_sk = btp.precedent_sk
+        WHERE btp.theme_sk = @themeSk
         ORDER BY p.judged_at DESC NULLS LAST, p.precedent_number DESC
         """;
 
@@ -57,16 +58,40 @@ public sealed class PrecedentReader(NpgsqlDataSource dataSource) : IPrecedentRea
             row.Status,
             row.JudgedAt is null ? null : DateOnly.FromDateTime(row.JudgedAt.Value),
             JudgingBodies.Name(row.JudgingBody),
-            row.Link);
+            row.Link)
+        {
+            Type = row.Type,
+            StatusDate = row.StatusDate is null ? null : DateOnly.FromDateTime(row.StatusDate.Value),
+            SuspendsCases = row.SuspendsCases,
+            LeadingCases = row.LeadingCases
+        };
 
-    private sealed record PrecedentRow(
-        string Kind,
-        int Number,
-        string Thesis,
-        string? Question,
-        string Status,
-        DateTime? JudgedAt,
-        string? JudgingBody,
-        string Link,
-        DateTime ExtractedAt);
+    private sealed class PrecedentRow
+    {
+        public string Kind { get; init; } = "";
+
+        public int Number { get; init; }
+
+        public string Thesis { get; init; } = "";
+
+        public string? Question { get; init; }
+
+        public string Status { get; init; } = "";
+
+        public DateTime? JudgedAt { get; init; }
+
+        public string? JudgingBody { get; init; }
+
+        public string Link { get; init; } = "";
+
+        public DateTime ExtractedAt { get; init; }
+
+        public string? Type { get; init; }
+
+        public DateTime? StatusDate { get; init; }
+
+        public bool? SuspendsCases { get; init; }
+
+        public string[] LeadingCases { get; init; } = [];
+    }
 }

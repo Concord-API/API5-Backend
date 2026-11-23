@@ -26,8 +26,53 @@ public class ThemePrecedentsControllerTests(ApiFactory factory) : IClassFixture<
                 new DateOnly(2016, 12, 14),
                 "Segunda Seção",
                 "https://processo.stj.jus.br/repetitivos/temas_repetitivos/pesquisa.jsp?novaConsulta=true&tipo_pesquisa=T&cod_tema_inicial=952&cod_tema_final=952")
+            {
+                Type = "tema_repetitivo",
+                StatusDate = new DateOnly(2017, 3, 2),
+                SuspendsCases = true,
+                LeadingCases = ["REsp 1568244/RJ", "REsp 1280211/SP"]
+            }
         ],
         1);
+
+    private async Task<JsonElement> SinglePrecedentAsync()
+    {
+        factory.PrecedentReader
+            .Setup(reader => reader.GetThemeAsync(412, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Precedents);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/themes/412/precedents");
+
+        return Assert.Single(body.GetProperty("precedents").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Returns_the_type_status_date_suspension_and_leading_cases_of_each_precedent()
+    {
+        var precedent = await SinglePrecedentAsync();
+
+        Assert.Equal("Tema", precedent.GetProperty("kind").GetString());
+        Assert.Equal("tema_repetitivo", precedent.GetProperty("type").GetString());
+        Assert.Equal("Trânsito em Julgado", precedent.GetProperty("status").GetString());
+        Assert.Equal("2017-03-02", precedent.GetProperty("statusDate").GetString());
+        Assert.True(precedent.GetProperty("suspendsCases").GetBoolean());
+        Assert.Equal(
+            ["REsp 1568244/RJ", "REsp 1280211/SP"],
+            precedent.GetProperty("leadingCases").EnumerateArray().Select(item => item.GetString()));
+    }
+
+    [Fact]
+    public async Task Returns_no_outcome_rate_or_binding_effect_with_the_precedent()
+    {
+        var precedent = await SinglePrecedentAsync();
+
+        Assert.Equal(
+            [
+                "judgedAt", "judgingBody", "kind", "leadingCases", "link", "number", "question", "status",
+                "statusDate", "suspendsCases", "thesis", "type"
+            ],
+            precedent.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+    }
 
     [Fact]
     public async Task Returns_the_theses_of_the_theme_with_their_source()
