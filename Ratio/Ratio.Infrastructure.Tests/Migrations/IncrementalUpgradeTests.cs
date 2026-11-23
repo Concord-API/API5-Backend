@@ -33,7 +33,8 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         Assert.Equal(
             [
                 "Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql",
-                "Ratio.Infrastructure.Migrations.Scripts.V025__court_rulings.sql"
+                "Ratio.Infrastructure.Migrations.Scripts.V025__court_rulings.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V027__expand_search_query_once.sql"
             ],
             appliedScripts);
 

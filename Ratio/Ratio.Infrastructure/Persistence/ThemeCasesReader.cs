@@ -37,18 +37,47 @@ public sealed class ThemeCasesReader(NpgsqlDataSource dataSource) : IThemeCasesR
         return await ReadCasesAsync(connection, themeKey, limit, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SampleCase>?> ListAllCasesAsync(long themeKey, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        var exists = await connection.ExecuteScalarAsync<bool>(
+            new CommandDefinition(ThemeSql, new { themeKey }, cancellationToken: cancellationToken));
+
+        if (!exists)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await QueryCasesAsync(connection, themeKey, null, cancellationToken);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
+        {
+            return [];
+        }
+    }
+
+    private static async Task<SampleCase[]> QueryCasesAsync(
+        NpgsqlConnection connection, long themeKey, int? limit, CancellationToken cancellationToken)
+    {
+        var rows = await connection.QueryAsync<CaseRow>(
+            new CommandDefinition(CasesSql, new { themeKey, limit }, cancellationToken: cancellationToken));
+
+        return rows.Select(ToSampleCase).ToArray();
+    }
+
     private static async Task<ThemeCases> ReadCasesAsync(
         NpgsqlConnection connection, long themeKey, int limit, CancellationToken cancellationToken)
     {
         try
         {
-            var rows = await connection.QueryAsync<CaseRow>(
-                new CommandDefinition(CasesSql, new { themeKey, limit }, cancellationToken: cancellationToken));
+            var cases = await QueryCasesAsync(connection, themeKey, limit, cancellationToken);
 
             var total = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(TotalSql, new { themeKey }, cancellationToken: cancellationToken));
 
-            return new ThemeCases(themeKey, rows.Select(ToSampleCase).ToArray(), total);
+            return new ThemeCases(themeKey, cases, total);
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ObjectNotInPrerequisiteState)
         {
