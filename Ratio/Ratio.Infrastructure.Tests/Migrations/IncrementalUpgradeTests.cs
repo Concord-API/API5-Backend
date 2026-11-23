@@ -16,7 +16,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
     {
         var connectionString = await postgres.CreateDatabaseAsync();
 
-        await ApplyMigrationsThroughAsync(connectionString, 23);
+        await ApplyMigrationsThroughAsync(connectionString, 27);
 
         await using (var connection = new NpgsqlConnection(connectionString))
         {
@@ -32,8 +32,7 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
 
         Assert.Equal(
             [
-                "Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql",
-                "Ratio.Infrastructure.Migrations.Scripts.V027__expand_search_query_once.sql",
+                "Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql",
                 "Ratio.Infrastructure.Migrations.Scripts.V030__keep_themes_with_every_search_term.sql"
             ],
             appliedScripts);
@@ -44,16 +43,13 @@ public sealed class IncrementalUpgradeTests(PostgresFixture postgres) : IClassFi
         var preservedRows = await verification.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM dw.dim_theme WHERE theme_key = 900001");
         var journalRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V024__theme_appeal_by_instance.sql'");
-        var materializedViewRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM pg_matviews WHERE schemaname = 'dw' AND matviewname = 'theme_appeal_by_instance'");
-        var uniqueIndexRows = await verification.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'dw' AND indexname = 'idx_theme_appeal_by_instance_pk'");
+            "SELECT COUNT(*) FROM migrations.schema_versions WHERE scriptname = 'Ratio.Infrastructure.Migrations.Scripts.V028__court_site_case.sql'");
+        var tableRows = await verification.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('case_site_detail', 'case_site_movement')");
 
         Assert.Equal(1, preservedRows);
         Assert.Equal(1, journalRows);
-        Assert.Equal(1, materializedViewRows);
-        Assert.Equal(1, uniqueIndexRows);
+        Assert.Equal(2, tableRows);
     }
 
     private static async Task ApplyMigrationsThroughAsync(string connectionString, int version)
